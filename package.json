@@ -1,7 +1,7 @@
 {
   "name": "dsh-baize-rules",
   "description": "User-set session/global must-do and must-not requirements injected at conversation start (Baize).",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -92,5 +92,19 @@
     "type": "git",
     "url": "git+https://github.com/bvcvb/dsh-baize-rules.git"
   },
-  "homepage": "https://github.com/bvcvb/dsh-baize-rules"
+  "homepage": "https://github.com/bvcvb/dsh-baize-rules",
+  "author": "bvcvb <bvcvb@163.com> (https://github.com/bvcvb)",
+  "bugs": {
+    "url": "https://github.com/bvcvb/dsh-baize-rules/issues"
+  },
+  "keywords": [
+    "dsh",
+    "plugin",
+    "rules",
+    "requirements",
+    "session",
+    "baize",
+    "must-do",
+    "must-not"
+  ]
 }
