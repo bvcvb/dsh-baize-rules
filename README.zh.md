@@ -214,12 +214,18 @@ pnpm typecheck             # npx tsc --noEmit
 
 ## 发布
 
+发布是**单一来源**：升版本号、推送 `v*` tag，由 GitHub Actions 自动发布到 npm；**请勿在本地手动 `npm publish`**——否则会跟 tag 触发的发布冲突（同一版本无法重复发布）。
+
 ```bash
-pnpm build && pnpm test      # 发布前确认构建与测试通过
-npm publish --access public  # package.json 已含 publishConfig.access=public
+# 1. 升版本：更新 package.json 的 version + 两份 README 里的安装示例
+# 2. 本地验证
+pnpm build && pnpm test
+# 3. 提交并推送 tag，触发 CI 发布
+git add -A && git commit -m "release: vX.Y.Z"
+git tag vX.Y.Z && git push origin main --tags
 ```
 
-> 发布后建议补上 `repository` 字段指向公开 git 仓库，供社区查阅与反馈。
+`.github/workflows/ci.yml` 的 `publish` job 在 `v*` tag 时运行，需 `test` 通过，并使用 GitHub `NPM_TOKEN` secret。
 
 ---
 

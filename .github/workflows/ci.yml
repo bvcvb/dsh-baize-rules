@@ -1,5 +1,9 @@
 name: CI
 
+# Publishing is single-source: the `publish` job below runs on `v*` tags and is the ONLY
+# way releases reach npm. Do NOT run `npm publish` locally — it would conflict with the
+# tag-triggered publish for the same version.
+
 on:
   push:
     branches: [main]

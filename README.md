@@ -214,14 +214,24 @@ Change the pure functions in `src/rules.ts` (rendering) or `src/core.ts` (comman
 
 ## Publishing
 
+Releases are **single-source**: bump the version, push a `v*` tag, and GitHub Actions publishes to npm. **Don't run `npm publish` locally** — doing so alongside a tag would conflict, since a version can't be published twice.
+
 ```bash
-pnpm build && pnpm test      # Confirm build & tests pass before publishing
-npm publish --access public  # package.json already has publishConfig.access=public
+# 1. Bump the version: update `version` in package.json + the install example in both READMEs
+# 2. Verify locally
+pnpm build && pnpm test
+# 3. Commit and push the tag to trigger the CI publish job
+git add -A && git commit -m "release: vX.Y.Z"
+git tag vX.Y.Z && git push origin main --tags
 ```
 
-> After publishing, keep the `repository` field pointing to the public git repo so the community can browse and provide feedback.
+The `publish` job in `.github/workflows/ci.yml` runs on `v*` tags, needs the `test` job to pass, and uses the GitHub `NPM_TOKEN` secret.
 
 ---
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
