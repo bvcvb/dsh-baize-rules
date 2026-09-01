@@ -1,7 +1,7 @@
 {
   "name": "dsh-baize-rules",
   "description": "User-set session/global must-do and must-not requirements injected at conversation start (Baize).",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -30,6 +30,7 @@
     "src",
     "cordis.patch.yml",
     "README.md",
+    "README.zh.md",
     "LICENSE"
   ],
   "publishConfig": {
