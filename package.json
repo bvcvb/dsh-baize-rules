@@ -40,7 +40,8 @@
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
   },
   "dsh": {
     "bundle": {
