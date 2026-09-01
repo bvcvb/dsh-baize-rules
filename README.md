@@ -223,6 +223,10 @@ npm publish --access public  # package.json 已含 publishConfig.access=public
 
 ---
 
+## 变更日志
+
+见 [CHANGELOG.md](./CHANGELOG.md)。
+
 ## 许可证
 
 [MIT](./LICENSE)
