@@ -32,7 +32,7 @@ The name comes from **Baize (白泽)** — a mythical beast said to "understand 
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.1.2
+dsh plugin --profile web add dsh-baize-rules@0.1.3
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```

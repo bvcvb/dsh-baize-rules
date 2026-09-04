@@ -3,6 +3,9 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.3] - 2026-09-03
+- Expand npm `keywords` (`deepseek-harness`, `agent-rules`, `system-reminder`, `developer`) and bump to v0.1.3.
+
 ## [0.1.2] - 2026-09-01
 - Add a bilingual README: `README.md` (English, main) + `README.zh.md` (Chinese), and ship `README.zh.md` in the npm package (`files`).
 - Make publishing single-source: releases are driven by a `v*` tag through GitHub Actions (no manual local `npm publish`).

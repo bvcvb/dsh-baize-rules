@@ -32,7 +32,7 @@
 
 ```bash
 # 从 npm 安装到 web profile（版本以发布后的实际版本为准）
-dsh plugin --profile web add dsh-baize-rules@0.1.2
+dsh plugin --profile web add dsh-baize-rules@0.1.3
 pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 dsh --profile web
 ```
