@@ -1,5 +1,6 @@
 # dsh-baize-rules
 
+[![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/bvcvb/dsh-baize-rules)
 ![npm version](https://img.shields.io/npm/v/dsh-baize-rules)
 ![license](https://img.shields.io/npm/l/dsh-baize-rules)
 
