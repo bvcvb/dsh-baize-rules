@@ -3,6 +3,9 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.4] - 2026-09-03
+- Add dsh-plugin.org `listed` badge to the README (EN + ZH).
+
 ## [0.1.3] - 2026-09-03
 - Expand npm `keywords` (`deepseek-harness`, `agent-rules`, `system-reminder`, `developer`) and bump to v0.1.3.
 
