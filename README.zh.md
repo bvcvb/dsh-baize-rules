@@ -1,5 +1,7 @@
 # dsh-baize-rules
 
+**[English](README.md) | 简体中文**
+
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/bvcvb/dsh-baize-rules)
 ![npm version](https://img.shields.io/npm/v/dsh-baize-rules)
 ![license](https://img.shields.io/npm/l/dsh-baize-rules)
@@ -39,6 +41,29 @@ dsh --profile web
 ```
 
 安装时依赖的 peer 包（`@deepseek-ai/` 系列、`react` 等）由 dsh profile 提供；若缺少，pnpm 会在 profile 目录里按 `peerDependencies` 解析。
+
+### 卸载
+
+```bash
+# 从 profile 移除插件
+dsh plugin --profile web remove dsh-baize-rules
+pm2 restart dsh          # dsh 由 pm2 托管时重载生效
+```
+
+若 `dsh.profile.bundles` 里仍残留该条目，删掉 `$DSH_HOME/profiles/web/package.json` 中对应那一行后再重启一次。`$DSH_HOME/rules/` 下的规则文件不会被删除——想要干净重来请自行删除。
+
+### 不影响正在运行的 dsh 试装
+
+装到**另一个 profile**，正在运行的 dsh 完全不受影响：
+
+```bash
+dsh plugin --profile smoke add dsh-baize-rules@0.1.4
+dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 dsh
+```
+
+`--dump-config` 只组合并打印配置树、不启动服务，所以可安全地与正在运行的 dsh 并存。要在那个 profile 里真正试用，再执行 `dsh --profile smoke`。
+
+> 关于 `pm2 restart dsh`：它会重载你正在运行的那个 profile。安装/卸载只改磁盘上的 profile，**下一次启动（或那次重启）才生效**。
 
 ### 本地开发联调（link）
 

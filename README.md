@@ -1,5 +1,7 @@
 # dsh-baize-rules
 
+**[English](README.md) | [简体中文](README.zh.md)**　—　中文说明见 [README.zh.md](README.zh.md)。
+
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/bvcvb/dsh-baize-rules)
 ![npm version](https://img.shields.io/npm/v/dsh-baize-rules)
 ![license](https://img.shields.io/npm/l/dsh-baize-rules)
@@ -39,6 +41,33 @@ dsh --profile web
 ```
 
 Peer dependencies (`@deepseek-ai/*`, `react`, etc.) are provided by the dsh profile; if any are missing, pnpm resolves them against `peerDependencies` in the profile directory.
+
+### Uninstall
+
+```bash
+# Remove the plugin from the profile
+dsh plugin --profile web remove dsh-baize-rules
+pm2 restart dsh          # Reload when dsh is managed by pm2
+```
+
+If the entry lingers in the profile's `dsh.profile.bundles`, delete that line from
+`$DSH_HOME/profiles/web/package.json` and restart dsh again. Your rule files under
+`$DSH_HOME/rules/` are not touched — delete them by hand if you want a clean slate.
+
+### Try it without touching your running setup
+
+Install into a **separate profile** so your currently running dsh stays unchanged:
+
+```bash
+dsh plugin --profile smoke add dsh-baize-rules@0.1.4
+dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
+```
+
+`--dump-config` only composes and prints the tree; it does not start a server, so it is safe to run
+alongside your live dsh. To actually try the plugin in that profile, run `dsh --profile smoke`.
+
+> Note on `pm2 restart dsh`: it reloads the profile you are running. Install/remove only changes the
+> profile on disk — nothing takes effect until the next boot (or that restart).
 
 ### Local development (link)
 
