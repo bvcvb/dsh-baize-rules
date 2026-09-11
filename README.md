@@ -35,7 +35,7 @@ The name comes from **Baize (白泽)** — a mythical beast said to "understand 
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.1.4
+dsh plugin --profile web add dsh-baize-rules@0.1.5
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```
@@ -59,7 +59,7 @@ If the entry lingers in the profile's `dsh.profile.bundles`, delete that line fr
 Install into a **separate profile** so your currently running dsh stays unchanged:
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.1.4
+dsh plugin --profile smoke add dsh-baize-rules@0.1.5
 dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
 ```
 

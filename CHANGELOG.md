@@ -3,6 +3,10 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.5] - 2026-09-07
+- README: add a prominent link to the Chinese README (`README.zh.md`) from the top of `README.md` (and vice versa).
+- README: document uninstall, and a safe try-out path (`--dump-config`) that does not touch the running dsh; clarify `pm2 restart dsh`.
+
 ## [0.1.4] - 2026-09-03
 - Add dsh-plugin.org `listed` badge to the README (EN + ZH).
 
