@@ -3,7 +3,8 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [0.1.5] - 2026-09-07
+## [0.1.5] - 2026-09-11
+- Client UI: fix the sidebar footer so plugin entries stack one per row instead of being laid out in a single nowrap flex strip. The shell's `.footerActions` row is unshrinkable, so a second full-width entry (Baize's trigger next to the wallet ring) overflowed the column and pushed the later button outside the sidebar. Two rules are injected: one pinning the shell strip by its CSS-Modules name fragment, and one class-name-independent `:has(> …)` fallback; both are guarded with `:not(.baize-rail)` so the collapsed 56px rail keeps its even row of circular icons. Either rule fails silently, falling back to the previous inline behaviour.
 - README: add a prominent link to the Chinese README (`README.zh.md`) from the top of `README.md` (and vice versa).
 - README: document uninstall, and a safe try-out path (`--dump-config`) that does not touch the running dsh; clarify `pm2 restart dsh`.
 
