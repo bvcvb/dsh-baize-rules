@@ -1,7 +1,7 @@
 {
   "name": "dsh-baize-rules",
   "description": "User-set session/global must-do and must-not requirements injected at conversation start (Baize).",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -101,6 +101,7 @@
   },
   "keywords": [
     "dsh",
+    "dsh-plugin",
     "plugin",
     "rules",
     "requirements",
