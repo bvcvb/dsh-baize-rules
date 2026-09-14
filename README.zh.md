@@ -10,6 +10,8 @@
 
 [dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) 的**会话 / 全局「必须做 / 不能做」要求**插件。名字取自**白泽**——传说中「通万物之情、晓万物之名、知万物之理」的神兽，用它来承载「用户给模型立下的行为基线」。
 
+![dsh web UI 里的「规则」面板——作用域标签（对话 / 项目 / 全局）、添加规则输入框与已生效规则列表](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
+
 - 规则是**纯文本**，没有 `must`/`mustNot` 标记——「必须做 / 不能做」由正文语言表达（例如 `用中文写注释。`=必须，`不要删除测试。`=禁止）。
 - 注入发生在**会话起点**：把当前生效规则作为一条**持久** `user/message` 注入模型请求，套用 `<system-reminder>` 框架，来源标记为 `source.kind='plugin'`、`plugin='baize-rules'`。
 - **无规则则不注入**；字节预算小到裁光所有规则时返回 `undefined`，绝不注入空壳 reminder。
@@ -104,6 +106,8 @@ dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 ds
 ```
 /baize-rules [list|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|scope <global|session|project>|clear <scope>|export]
 ```
+
+![斜杠命令菜单里的 `/baize-rules` 条目：查看/增删改 会话或全局的 必须/禁止 要求](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
 
 | 子命令 | 语法 | 作用 |
 |---|---|---|
@@ -240,18 +244,20 @@ pnpm typecheck             # npx tsc --noEmit
 
 ## 发布
 
-发布是**单一来源**：升版本号、推送 `v*` tag，由 GitHub Actions 自动发布到 npm；**请勿在本地手动 `npm publish`**——否则会跟 tag 触发的发布冲突（同一版本无法重复发布）。
+发布由 `v*` tag 驱动，但**真正把版本发出去的是本地命令**。`.github/workflows/ci.yml` 的 `publish` job 需要 `NPM_TOKEN` secret，而本仓库并未配置，因此每次 tag 运行都会以 `npm error code ENEEDAUTH` 失败（已在 v0.1.3、v0.1.4、v0.1.5 上验证）。在这个 secret 配置好之前，`npm publish --access public` 才是实际发布动作。
 
 ```bash
 # 1. 升版本：更新 package.json 的 version + 两份 README 里的安装示例
 # 2. 本地验证
-pnpm build && pnpm test
-# 3. 提交并推送 tag，触发 CI 发布
+pnpm build && pnpm typecheck && pnpm test
+# 3. 提交、打 tag 并推送（tag 运行仍提供 CI 的 build+test 把关）
 git add -A && git commit -m "release: vX.Y.Z"
-git tag vX.Y.Z && git push origin main --tags
+git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin main && git push origin vX.Y.Z
+# 4. 发布——这一步才真正发出去
+npm publish --access public
 ```
 
-`.github/workflows/ci.yml` 的 `publish` job 在 `v*` tag 时运行，需 `test` 通过，并使用 GitHub `NPM_TOKEN` secret。
+`publish` job 在 `v*` tag 时运行、需 `test` 通过；在 `NPM_TOKEN` 加进仓库 secrets 之前，它会一直显示失败。
 
 ---
 

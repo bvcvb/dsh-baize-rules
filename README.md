@@ -10,6 +10,8 @@
 
 The name comes from **Baize (白泽)** — a mythical beast said to "understand the nature of all creatures, know the names of all things, and comprehend the principles of everything." It carries the behavioral baseline that the user sets for the model.
 
+![The rules panel in the dsh web UI — scope tabs (conversation / project / global), the add-rule field, and the active rules listed](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
+
 - Rules are **plain text** with no `must`/`mustNot` markers — whether something is "must-do" or "must-not" is expressed by the language of the body itself (e.g. `Write comments in Chinese.` = must, `Do not delete the tests.` = must-not).
 - Injection happens at the **start of a conversation**: the currently active rules are injected into the model request as a **persistent** `user/message`, wrapped in a `<system-reminder>` frame, with `source.kind='plugin'` and `plugin='baize-rules'`.
 - **No rules → no injection**; if the byte budget shrinks such that all rules are cut, it returns `undefined` and never injects an empty reminder shell.
@@ -108,6 +110,8 @@ All subcommands live under **`/baize-rules`**; no argument is equivalent to `lis
 ```
 /baize-rules [list|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|scope <global|session|project>|clear <scope>|export]
 ```
+
+![`/baize-rules` in the slash-command menu, described as "查看/增删改 会话或全局的 必须/禁止 要求"](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
 
 | Subcommand | Syntax | Purpose |
 |---|---|---|
@@ -244,18 +248,20 @@ Change the pure functions in `src/rules.ts` (rendering) or `src/core.ts` (comman
 
 ## Publishing
 
-Releases are **single-source**: bump the version, push a `v*` tag, and GitHub Actions publishes to npm. **Don't run `npm publish` locally** — doing so alongside a tag would conflict, since a version can't be published twice.
+Releases are driven from a `v*` tag, but **the publish itself is a local command**. The `publish` job in `.github/workflows/ci.yml` requires the `NPM_TOKEN` secret, which is not configured in this repository — so it fails with `npm error code ENEEDAUTH` on every tag (verified on v0.1.3, v0.1.4 and v0.1.5). Until that secret is set, `npm publish --access public` is the step that actually ships a version.
 
 ```bash
 # 1. Bump the version: update `version` in package.json + the install example in both READMEs
 # 2. Verify locally
-pnpm build && pnpm test
-# 3. Commit and push the tag to trigger the CI publish job
+pnpm build && pnpm typecheck && pnpm test
+# 3. Commit, tag, and push both (the tag run still gives you the CI build+test gate)
 git add -A && git commit -m "release: vX.Y.Z"
-git tag vX.Y.Z && git push origin main --tags
+git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin main && git push origin vX.Y.Z
+# 4. Publish — this is the step that actually ships
+npm publish --access public
 ```
 
-The `publish` job in `.github/workflows/ci.yml` runs on `v*` tags, needs the `test` job to pass, and uses the GitHub `NPM_TOKEN` secret.
+The `publish` job runs on `v*` tags and needs the `test` job to pass; it will keep reporting failure until `NPM_TOKEN` is added to the repository secrets.
 
 ---
 
