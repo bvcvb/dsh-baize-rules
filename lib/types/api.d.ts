@@ -1,11 +1,19 @@
 /**
  * Host HTTP API for the rules panel. The client (`lib/client.js`) fetches rules
- * via GET and applies mutations via POST, reusing the same store + core as the
- * `/baize-rules` command (so the panel and command are the same source of truth).
+ * and templates via GET and applies mutations via POST, reusing the same store +
+ * core as the `/baize-rules` command (so the panel and the command are the same
+ * source of truth).
  *
  * Routes (json):
- *   GET  /baize-rules.api?sessionId=...  -> { global, session }
- *   POST /baize-rules.api { sessionId, raw, scope } -> { ok, text, view }
+ *   GET  /baize-rules.api?sessionId=&project=
+ *        -> { global, session, project, templates }
+ *   POST /baize-rules.api { op?, sessionId, project, … }
+ *        -> { ok, text, view, templates, … }
+ *
+ * `op` defaults to `raw` — the pre-templates contract `{ raw, scope }` still
+ * works unchanged. The other ops exist because the panel drives structured
+ * edits (tags, template CRUD, template apply, import/export) that would be
+ * awkward to express as command lines.
  *
  * @module dsh-baize-rules/api
  */

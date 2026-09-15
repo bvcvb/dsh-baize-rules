@@ -1,8 +1,10 @@
 /**
- * Thin dsh adapter for the `/rules` command: feeds the live `view` + current
- * `defaultScope` into the dependency-free decision core (`core.ts`), then
- * persists the resulting `nextView` (global → disk, session → memory) and any
- * `/rules scope` default change.
+ * Thin dsh adapter for the `/baize-rules` command: feeds the live `view`, the
+ * template library, and the current `defaultScope` into the dependency-free
+ * decision core (`core.ts`), then persists the resulting `nextView` /
+ * `nextTemplates` and any `/rules scope` default change. The file IO behind
+ * `tmpl export <file>` / `tmpl import <file>` also lives here — the core never
+ * touches the filesystem.
  *
  * @module dsh-baize-rules/command
  */

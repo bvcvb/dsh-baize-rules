@@ -35,6 +35,10 @@ export interface Config {
   globalRulesPath?: string
   /** When true, re-render an updated rules message on every step, not just on change. */
   injectAtEveryStep?: boolean
+  /** When true, prefix each injected bullet with its `[tag,tag]` labels. Off by
+   *  default: tags are a panel-side classification aid, and injecting them both
+   *  spends the byte budget and adds noise to every request. */
+  injectTags?: boolean
 }
 
 /** Schemastery validation for {@link Config}. */
@@ -43,6 +47,7 @@ export const Config: z<Config> = z.object({
   maxBytes: z.number().required(),
   globalRulesPath: z.string(),
   injectAtEveryStep: z.boolean(),
+  injectTags: z.boolean(),
 })
 
 /** Per-session digest of the last injected rules, used to suppress duplicate injection. */
@@ -66,9 +71,10 @@ export function apply(ctx: Context, config: Config): void {
     const decision = await next()
     if (decision.kind === 'reject' || signal.aborted) return decision
     const v = await view(ctx, agent, config)
-    const text = renderRules(v, config.maxBytes)
+    const render = { injectTags: config.injectTags === true }
+    const text = renderRules(v, config.maxBytes, render)
     if (text === undefined) return decision
-    const digest = await renderDigest(v, config.maxBytes)
+    const digest = await renderDigest(v, config.maxBytes, render)
     const previous = lastInjected.get(agent.session)
     if (!config.injectAtEveryStep && previous !== undefined && previous === digest) return decision
     lastInjected.set(agent.session, digest ?? '')
@@ -92,9 +98,9 @@ export function apply(ctx: Context, config: Config): void {
     }
     yield ctx.commands.register({
       name: 'baize-rules',
-      description: '查看/增删改 会话或全局的 必须/禁止 要求',
+      description: '查看/增删改 会话或全局的 必须/禁止 要求，并管理可复用的规则模板',
       input: {
-        hint: 'list | add <text> | remove <id> | enable|disable <id> | scope <global|session|project> | clear <scope> | export',
+        hint: 'list | add <text> | remove <id> | enable|disable <id> | tag <id> <tag…> | save <id> | from <id|#tag> | tmpl list|add|edit|rm|export|import | scope | clear | export',
       },
       handler: invocation => handle(ctx, invocation, runtime),
     })

@@ -24,6 +24,10 @@ export interface Config {
     globalRulesPath?: string;
     /** When true, re-render an updated rules message on every step, not just on change. */
     injectAtEveryStep?: boolean;
+    /** When true, prefix each injected bullet with its `[tag,tag]` labels. Off by
+     *  default: tags are a panel-side classification aid, and injecting them both
+     *  spends the byte budget and adds noise to every request. */
+    injectTags?: boolean;
 }
 /** Schemastery validation for {@link Config}. */
 export declare const Config: z<Config>;

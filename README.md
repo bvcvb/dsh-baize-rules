@@ -28,6 +28,8 @@ The name comes from **Baize (白泽)** — a mythical beast said to "understand 
 | **Deduplication** | Suppresses duplicate injection by SHA-1 digest of the rendered text; optional `injectAtEveryStep` forces a refresh on every step |
 | **Escape protection** | Literal `</system-reminder>` in rule bodies is escaped so user text can't close the plugin's frame |
 | **Command + API share the same source** | The `/baize-rules` command and the front-end panel use the same store/core, so there is always a single source of truth |
+| **Tags** | Rules can carry free-text tags (`flow`, `#frontend`) that the panel filters by. Panel-only by default — tags cost no model-context budget (`injectTags` opts in) |
+| **Template library** | Save frequently used rules as templates (body + tags) and apply them to any scope; export/import the library as JSON to move it across machines and sessions |
 
 ---
 
@@ -37,7 +39,7 @@ The name comes from **Baize (白泽)** — a mythical beast said to "understand 
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.1.6
+dsh plugin --profile web add dsh-baize-rules@0.2.0
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```
@@ -61,7 +63,7 @@ If the entry lingers in the profile's `dsh.profile.bundles`, delete that line fr
 Install into a **separate profile** so your currently running dsh stays unchanged:
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.1.6
+dsh plugin --profile smoke add dsh-baize-rules@0.2.0
 dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
 ```
 
@@ -99,6 +101,15 @@ Then run `pnpm install` in the profile directory and add `dsh-baize-rules` to `d
 /baize-rules scope global                      # Subsequent commands default to global
 /baize-rules clear session                     # Clear the current session's rules
 /baize-rules export                            # Export all rules as JSON
+# --- tags ---
+/baize-rules tag <id> flow release              # Tag a rule (idempotent, deduped)
+/baize-rules untag <id> release                 # Drop one tag
+# --- templates ---
+/baize-rules save <id>                          # Store this rule as a template
+/baize-rules tmpl list                          # List the template library (optionally by tag)
+/baize-rules from <id|#tag>                     # Add rules from templates (#tag = all with that tag)
+/baize-rules tmpl export ./templates.json       # Export the library to a JSON file
+/baize-rules tmpl import ./templates.json --yes # Import (dry run by default; --yes writes)
 ```
 
 ---
@@ -108,7 +119,7 @@ Then run `pnpm install` in the profile directory and add `dsh-baize-rules` to `d
 All subcommands live under **`/baize-rules`**; no argument is equivalent to `list`.
 
 ```
-/baize-rules [list|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|scope <global|session|project>|clear <scope>|export]
+/baize-rules [list|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|tag|untag <id> <tag…>|save <id> [#tag…]|from <id|#tag> [scope]|tmpl <list|add|edit|rm|export|import>|scope <global|session|project>|clear <scope>|export]
 ```
 
 ![`/baize-rules` in the slash-command menu, described as "查看/增删改 会话或全局的 必须/禁止 要求"](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
@@ -117,30 +128,56 @@ All subcommands live under **`/baize-rules`**; no argument is equivalent to `lis
 |---|---|---|
 | **list** | `/baize-rules list` | List the merged active rules (`Project`/`Global`/`Session` sections; shows `No active rules.` when empty) |
 | **add** | `/baize-rules add <text>` | Append a rule to the target scope (default `scope`); the text *is* the rule |
-| **remove** | `/baize-rules remove <id>` | Delete a rule by its **full id** |
+| **remove** | `/baize-rules remove <id>` | Delete a rule (id or **unique prefix**) |
 | **edit** | `/baize-rules edit <id> <text>` | Change a rule's text |
 | **enable** | `/baize-rules enable <id>` | Enable a disabled rule |
 | **disable** | `/baize-rules disable <id>` | Disable a rule (keep but not active) |
+| **tag** | `/baize-rules tag <id> <tag…>` | Append tags to a rule (idempotent, deduped, case-insensitive) |
+| **untag** | `/baize-rules untag <id> <tag…>` | Remove the named tags |
+| **save** | `/baize-rules save <id> [#tag…]` | Store the rule as a template; merges tags if a same-text template exists |
+| **from** | `/baize-rules from <id\|#tag> [scope]` | Add rules from templates; `#tag` adds **every** template carrying that tag |
+| **tmpl** | `/baize-rules tmpl <subcommand>` | Template library management (below) |
 | **scope** | `/baize-rules scope <global\|session\|project>` | Switch the default scope for subsequent commands (persistent for the current process) |
 | **clear** | `/baize-rules clear <global\|session\|project>` | Clear all rules in a scope |
-| **export** | `/baize-rules export` | Export `{ global, session }` as JSON |
+| **export** | `/baize-rules export` | Export `{ global, session, project }` as JSON |
+
+**`tmpl` subcommands**
+
+| Subcommand | Syntax | Purpose |
+|---|---|---|
+| **list** | `/baize-rules tmpl list [tag]` | List templates (abbreviated id, tags, use count), optionally filtered by tag |
+| **add** | `/baize-rules tmpl add <text> [#tag…]` | Create a template |
+| **edit** | `/baize-rules tmpl edit <id> [<text>] [#tag…]` | Change body and/or tags; omit `<text>` to retag only |
+| **rm** | `/baize-rules tmpl rm <id>` | Delete a template |
+| **export** | `/baize-rules tmpl export [<file>]` | Export the library (prints JSON when no path is given) |
+| **import** | `/baize-rules tmpl import <file> [--merge\|--replace] [--dry-run] [--yes]` | Import a library (**dry run by default**; only `--yes` writes) |
 
 **Argument details**
 
 - `<text>`: the rule body, may contain spaces. Whether it's "must-do" or "must-not" is expressed by the body's language; there is no marker.
 - `<id>`: a stable rule id (`crypto.randomUUID`). `list` shows the **first 8 characters** as an abbreviated id for readability;
-  when running `remove`/`edit`/`enable`/`disable` please provide the **full id** (you can view it via `list` or `export`).
+  `remove`/`edit`/`enable`/`disable`/`tag`/`untag`/`save` all accept the **full id or a unique prefix**.
+  An ambiguous prefix reports `ambiguous` and lists the candidates — it never guesses. Same for `tmpl rm`/`tmpl edit`.
+- `<tag…>`: free-text tags, space separated, `#` prefix optional (`#flow` ≡ `flow`). At most **8 tags** per item,
+  **24 characters** each; dedupe and filtering are **case-insensitive**, while the stored spelling is what you first typed.
+- `from` duplicate guard: a rule whose text already exists in the target scope is skipped
+  (`Skipped N duplicate(s)`), so re-adding from a template never piles up duplicates. A template that is
+  actually applied gets its **use count +1**.
 
 ### Scope syntax
 
-`add/remove/edit/enable/disable` support an **explicit scope**, two equivalent ways:
+`add/remove/edit/enable/disable/from` support an **explicit scope**, two equivalent ways:
 
 - **Prefix**: `/baize-rules global add Write in Chinese.`
 - **Suffix**: `/baize-rules add Write in Chinese. global` (only when the scope is the **last token**)
 
-> Only `add/remove/edit/enable/disable` recognize a trailing scope keyword as a scope modifier;
+> Only `add/remove/edit/enable/disable/from` recognize a trailing scope keyword as a scope modifier;
 > the argument to `scope`/`clear` is itself a scope and won't be swallowed. So a scope word inside the body
 > won't be misparsed (e.g. `/baize-rules add Writeglobal`).
+>
+> Verbs that take free tag text (`tag`/`untag`/`save`) support the **prefix form only**:
+> `/baize-rules global tag <id> frontend`. That way a tag literally named `project`/`global`/`session`
+> is never swallowed as a scope.
 
 When no scope is given, the default set by `/baize-rules scope` is used (initially from `Config.scope`, usually `session`).
 
@@ -152,6 +189,7 @@ When no scope is given, the default set by `/baize-rules scope` is used (initial
 - **Specificity wins**: `project > session > global`; when the budget is tight the broader `global` rules are trimmed first.
 - **Deduplication**: a SHA-1 digest is computed over the rendered text; unchanged rules aren't re-injected. `injectAtEveryStep:true` forces a refresh on each step.
 - **Escape**: a literal `</system-reminder>` in a body is escaped via `escapeReminder`.
+- **Tags stay out of the model**: tags are **not** injected by default (`injectTags:false`), so tagging or retagging a rule neither changes the text the model sees nor triggers a redundant re-injection.
 - **Empty / fully trimmed**: when there are no rules, or the budget cuts all of them, it returns `undefined` (i.e. does not inject that message).
 
 ### What the model actually sees
@@ -182,6 +220,7 @@ On startup the plugin validates `Config` with `@deepseek-ai/schemastery`; an inv
 | `maxBytes` | — (required) | Byte cap visible to the model; trimmed with specificity-wins when exceeded |
 | `globalRulesPath` | `$DSH_HOME/rules/global.json` | Override the global rules file path |
 | `injectAtEveryStep` | `false` | Force re-render on every step (debugging); default only patches on change |
+| `injectTags` | `false` | When `true`, render tags into the model context (`- [flow,release] body`). Off by default: tags are a human-facing classifier, and injecting them spends budget and adds noise |
 
 ### Mount metadata (`cordis.patch.yml`)
 
@@ -197,6 +236,7 @@ The published npm package ships `dsh.bundle.patch`, wired up automatically by ds
 | global | `$DSH_HOME/rules/global.json` | On any command / API submission | ✅ across restarts |
 | session | `$DSH_HOME/rules/sessions/<sessionId>.json` | Same | ✅ across restarts |
 | project | `$DSH_HOME/rules/projects/<slug>.json` (slug from the session cwd) | Same | ✅ across restarts |
+| templates | `$DSH_HOME/rules/templates.json` (global, not bound to any scope) | On template create/update/delete, import, or an apply that bumps the use count | ✅ across restarts |
 
 > `$DSH_HOME` is resolved by `@deepseek-ai/dsh-home-paths`, default `~/.dsh`.
 > Reads/writes go through `ctx.fs` (`resolve/stat/readText/writeText`, auto-creating directories on write); missing is tolerated, corrupt files fail loudly.
@@ -206,22 +246,37 @@ The published npm package ships `dsh.bundle.patch`, wired up automatically by ds
 
 ## Client panel (optional)
 
-The published package also exposes a dsh web client panel (`lib/client.js`; see the `./client` entry in `package.json` `exports`), talking to the same store/core as the command through the host HTTP API `/baize-rules.api`:
+The published package also exposes a dsh web client panel (`lib/client.js`; see the `./client` entry in `package.json` `exports`), talking to the same store/core as the command through the host HTTP API `/baize-rules.api`.
 
-- `GET /baize-rules.api?sessionId=…&project=…` → `{ global, session, project }`
-- `POST /baize-rules.api`, body `{ sessionId, raw, scope }` → `{ ok, text, view }`
+The panel has two panes:
+
+- **Rules**: scope switch, tag-chip filtering, per-row `Edit / Save as template / Remove`, and a **From template** picker for adding several templates at once.
+- **Templates**: create/edit (body + tags)/delete, `Add to rules` (pick a scope and apply), `Export` (download JSON) and `Import` (choose a file → dry-run preview → confirm).
+
+> **Scope availability**: the panel only offers session/project when it is **attached to a conversation** — opened from the new-chat page (no session yet) those two buttons are disabled with a hint and only global rules can be edited, which avoids the old behaviour where a rule looked added and then vanished.
+>
+> The project directory does **not** come from the panel: the host resolves the session's cwd itself (`resolveProject`), so project rules are available whenever you are in a conversation.
+
+API:
+
+- `GET /baize-rules.api?sessionId=…&project=…` → `{ global, session, project, templates }`
+- `POST /baize-rules.api`, body `{ sessionId, project, op, … }` → `{ ok, text, view, templates }`
+  - `op: 'raw'` (the default, and what older panels send) `{ raw, scope }` — one command line through the same core as `/baize-rules`
+  - rules: `rule.update`, `rule.setTags`, `rule.saveAsTemplate`, `rule.addFromTemplates`
+  - templates: `template.create`, `template.update`, `template.delete`, `template.export`, `template.import`
+  - every op returns the post-change `view` and `templates`, so one call refreshes both panes
 
 ---
 
 ## Module structure
 
 ```
-src/rules.ts      Pure logic: Rule model + render/<system-reminder>/byte budget(specificity-wins)/digest/escapeReminder
-src/core.ts       Pure logic: parseCommand/runCommand/scope resolution/CRUD (zero deps, unit-testable without dsh)
-src/store.ts      Pure logic: global/session/project rule file persistence (ctx.fs + dshHomePath)
-src/command.ts    Thin dsh adapter: feed view/defaultScope → core, persist nextView/defaultScope
+src/rules.ts      Pure logic: Rule/RuleTemplate models + tag normalization + render/<system-reminder>/byte budget(specificity-wins)/digest/escapeReminder
+src/core.ts       Pure logic: parseCommand/runCommand/scope resolution/CRUD/template library ops/template import-export (zero deps, unit-testable without dsh)
+src/store.ts      Pure logic: global/session/project rule files + templates.json persistence (ctx.fs + dshHomePath)
+src/command.ts    Thin dsh adapter: feed view/templates/defaultScope → core, persist nextView/nextTemplates; file IO for tmpl export|import
 src/index.ts      apply: agent/pre-step injection + /baize-rules command registration + API mount (inject: agents/commands/fs/webServer/sessions)
-src/api.ts        Host HTTP API: GET/POST /baize-rules.api (for the front-end panel)
+src/api.ts        Host HTTP API: GET + POST(op dispatch) /baize-rules.api (for the front-end panel)
 src/invariant.ts  dsh-invariants contract companion (name/inject/apply)
 scripts/dev-render.ts  Loop 0 demo
 test/*.spec.ts    rules/core/composition tests
