@@ -1,7 +1,7 @@
 /**
  * Loop 0 unit tests for the dependency-free command core (`src/core.ts`).
  * Locks in parsing, scope resolution (incl. the fixed "global not misread from
- * rule text"), CRUD application, and the REAL `/rules scope` default update.
+ * rule text"), CRUD application, and the REAL `/baize-rules scope` default update.
  *
  * @module dsh-baize-rules/core.spec
  */
@@ -54,11 +54,13 @@ describe('parseCommand', () => {
     expect(p.args).toEqual(['用中文写注释'])
   })
 
-  it('recognizes a trailing scope token (last arg only)', () => {
+  it('treats a trailing scope word as rule text, never as a scope', () => {
+    // Regression: `/baize-rules add 部署前先跑测试 global` used to silently drop
+    // the word `global` from the body AND write the rule to the global scope.
     const p = parseCommand('add 用中文写注释 global')
     expect(p.verb).toBe('add')
-    expect(p.scope).toBe('global')
-    expect(p.args).toEqual(['用中文写注释'])
+    expect(p.scope).toBeUndefined()
+    expect(p.args).toEqual(['用中文写注释', 'global'])
   })
 
   it('does NOT misread rule text containing "global" as a scope', () => {
@@ -67,10 +69,10 @@ describe('parseCommand', () => {
     expect(p.args).toEqual(['用global写'])
   })
 
-  it('isolates the scope token from following args', () => {
+  it('keeps a scope word at the end of a longer body', () => {
     const p = parseCommand('add 只 用 pnpm global')
-    expect(p.scope).toBe('global')
-    expect(p.args).toEqual(['只', '用', 'pnpm'])
+    expect(p.scope).toBeUndefined()
+    expect(p.args).toEqual(['只', '用', 'pnpm', 'global'])
   })
 })
 
@@ -386,8 +388,8 @@ describe('runCommand · from (template → rule)', () => {
     expect(out.text).toContain('Skipped 1 duplicate')
   })
 
-  it('accepts an explicit trailing scope', () => {
-    const out = cmdT('from aaaaaaa1 global')
+  it('accepts an explicit scope written before the verb', () => {
+    const out = cmdT('global from aaaaaaa1')
     expect(out.nextView!.global).toHaveLength(2)
   })
 

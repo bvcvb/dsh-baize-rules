@@ -14,11 +14,6 @@ import { normalizeTags, tagKey } from './rules.ts'
 
 export const RULE_SCOPES: readonly RuleScope[] = ['global', 'session', 'project']
 const SCOPE_SET = new Set<RuleScope>(RULE_SCOPES)
-/** Verbs where a trailing scope token is a *target* to modify, not an argument.
- *  Deliberately excludes `tag`/`untag`/`save`: their trailing tokens are free
- *  tag text, and a tag literally named `project` must not be swallowed as a
- *  scope (use the leading form instead: `/baize-rules global tag <id> 前端`). */
-const SCOPE_MODIFIER_VERBS = new Set<CommandVerb>(['add', 'remove', 'enable', 'disable', 'from'])
 /** Verbs whose trailing `#tag` tokens are metadata rather than argument text.
  *  `add` is excluded on purpose: a rule body may legitimately end in `#123`, and
  *  silently eating it would corrupt the rule. */
@@ -55,21 +50,43 @@ export interface CommandOutput {
   readonly nextView?: RuleView
   /** Present when the template library should be persisted to this new set. */
   readonly nextTemplates?: readonly RuleTemplate[]
-  /** Present when `/rules scope` chose a new default scope. */
+  /** Present when `/baize-rules scope` chose a new default scope. */
   readonly defaultScope?: RuleScope
   /** Present when `tmpl export <file>` should write this content to this path. */
   readonly exportFile?: { readonly path: string; readonly content: string }
 }
 
 const USAGE =
-  'Usage: /baize-rules [list|add <text>|remove <id>|edit <id> <text>|enable|disable <id>'
-  + '|tag|untag <id> <tag…>|save <id> [#tag…]|from <id|#tag> [scope]'
-  + '|tmpl list|add|edit|rm|export|import|scope <global|session|project>|clear <scope>|export]'
+  'Usage: /baize-rules [<scope>] <command> — scope is one of global|session|project, written '
+  + 'BEFORE the verb (`/baize-rules global add 用中文写注释`). Commands: '
+  + 'list [scope] | add <text> | remove <id> | edit <id> <text> | enable|disable <id>'
+  + ' | tag|untag <id> <tag…> | save <id> [#tag…] | from <id|#tag>'
+  + ' | tmpl list|add|edit|rm|export|import | scope <scope> | clear <scope> | export'
 
-/** Parse a `/rules` line into a verb + args, isolating an explicit scope keyword.
- *  Scope is accepted as a **leading** token (`/rules global add …`) or a
- *  **trailing** token (`/rules add … global`, only the LAST arg qualifies),
- *  so a rule whose text merely contains "global" is never misread as a scope.
+/** The scope a verb acts on: an explicit leading keyword wins, else the caller's
+ *  default. Trailing scope words are deliberately NOT parsed as scopes — a rule
+ *  body is free text, and `/baize-rules add 部署前先跑测试 global` used to lose
+ *  the word `global` from the body and write the rule to the global scope. */
+export function resolveScope(scope: RuleScope | undefined, fallback: RuleScope): RuleScope {
+  return scope ?? fallback
+}
+
+/** The scope named by an argument, when it is one. Used by `list`/`clear`/`scope`,
+ *  where the scope is the argument (`/baize-rules clear global`) rather than a
+ *  modifier, so both `clear global` and `global clear` work. */
+function scopeArgument(scope: RuleScope | undefined, args: readonly string[]): RuleScope | undefined {
+  if (scope !== undefined) return scope
+  const first = args[0]
+  return first !== undefined && SCOPE_SET.has(first as RuleScope) ? first as RuleScope : undefined
+}
+
+/** Parse a `/baize-rules` line into a verb + args, isolating an explicit scope
+ *  keyword.
+ *
+ *  Scope is accepted only as a **leading** token (`/baize-rules global add …`).
+ *  A trailing scope word is never stripped: it is part of the text or an
+ *  argument. That is the whole point — `add` takes free text, and treating its
+ *  last word as a scope silently truncated rule bodies and mis-targeted writes.
  *  For tag-aware verbs the trailing `#tag` run is split off into `tags`. */
 export function parseCommand(raw: string): ParsedCommand {
   const tokens = raw.trim().split(/\s+/).filter(Boolean)
@@ -86,13 +103,6 @@ export function parseCommand(raw: string): ParsedCommand {
   } else {
     verb = tokens[0] as CommandVerb | undefined
     rest = tokens.slice(1)
-    // Strip a trailing scope only for verbs that take a *target* scope modifier,
-    // never for `scope`/`clear` where the scope is the argument itself.
-    if (verb !== undefined && SCOPE_MODIFIER_VERBS.has(verb) && rest.length > 0
-      && SCOPE_SET.has(rest[rest.length - 1] as RuleScope)) {
-      scope = rest[rest.length - 1] as RuleScope
-      rest = rest.slice(0, -1)
-    }
   }
 
   // A trailing run of `#tag` tokens is tag metadata, not rule text. Only the
@@ -107,11 +117,6 @@ export function parseCommand(raw: string): ParsedCommand {
   return scope === undefined
     ? { verb, args: rest.filter(Boolean), tags }
     : { verb, args: rest.filter(Boolean), scope, tags }
-}
-
-/** Explicit scope wins, else the caller's default. */
-export function resolveScope(scope: RuleScope | undefined, fallback: RuleScope): RuleScope {
-  return scope ?? fallback
 }
 
 /** Mint a fully-specified rule (dependency-free; uses global `crypto.randomUUID`). */
@@ -200,18 +205,33 @@ export function tagsOf(rules: readonly Rule[]): string[] {
   return [...counts.values()].sort((a, b) => b.n - a.n).map(entry => entry.tag)
 }
 
-/** Render a compact human-readable list of the rules in one view. */
-export function formatList(view: RuleView): string {
+/** Sections in the same order as the model-visible rendering: most specific
+ *  first, so the list and the injected reminder never disagree on precedence. */
+const LIST_SECTIONS: readonly { readonly scope: RuleScope; readonly header: string }[] = [
+  { scope: 'project', header: 'Project:' },
+  { scope: 'session', header: 'Session:' },
+  { scope: 'global', header: 'Global:' },
+]
+
+/** Render a compact human-readable list of the rules in one view, optionally
+ *  narrowed to a single scope (`list project`). */
+export function formatList(view: RuleView, only?: RuleScope): string {
   const line = (rule: Rule) => {
     const tags = rule.tags ?? []
     const badge = tags.length > 0 ? `{${tags.join(',')}} ` : ''
     return `[${rule.id.slice(0, 8)}] ${badge}${rule.enabled ? '' : '(disabled) '}${rule.text}`
   }
+  const rulesOf = (scope: RuleScope): readonly Rule[] =>
+    scope === 'project' ? (view.project ?? []) : scope === 'session' ? view.session : view.global
   const parts: string[] = []
-  if (view.project && view.project.length > 0) { parts.push('Project:'); parts.push(...view.project.map(line)) }
-  if (view.global.length > 0) { parts.push('Global:'); parts.push(...view.global.map(line)) }
-  if (view.session.length > 0) { parts.push('Session:'); parts.push(...view.session.map(line)) }
-  return parts.length === 0 ? 'No active rules.' : parts.join('\n')
+  for (const { scope, header } of LIST_SECTIONS) {
+    if (only !== undefined && only !== scope) continue
+    const rules = rulesOf(scope)
+    if (rules.length === 0) continue
+    parts.push(header, ...rules.map(line))
+  }
+  if (parts.length === 0) return only === undefined ? 'No active rules.' : `No ${only} rules.`
+  return parts.join('\n')
 }
 
 /** Render the template library, optionally filtered to one tag. */
@@ -579,11 +599,13 @@ export function importTemplates(
 
 // --- The command dispatcher ---
 
-/** Apply one parsed `/rules` command to the given view + template library. */
+/** Apply one parsed `/baize-rules` command to the given view + template library. */
 export function runCommand(input: CommandInput): CommandOutput {
   const { verb, args, tags, scope } = parseCommand(input.raw)
   if (verb === undefined || verb === 'list') {
-    return { ok: true, text: formatList(input.view) }
+    // `list` narrows to a scope only when one is actually named; anything else
+    // is not a scope and is ignored rather than guessing.
+    return { ok: true, text: formatList(input.view, scopeArgument(scope, args)) }
   }
 
   const chosen = resolveScope(scope, input.defaultScope)
@@ -661,7 +683,8 @@ export function runCommand(input: CommandInput): CommandOutput {
       if (!hit.ok) return { ok: false, text: hit.error }
       const rule = findRule(input.view, chosen, hit.id) as Rule
       const out = saveRuleAsTemplate(templates, rule, extra)
-      return { ok: true, text: out.text, nextTemplates: out.templates }
+      // A no-op re-save is a success that changes nothing: no write, no file churn.
+      return { ok: out.ok, text: out.text, ...(out.changed ? { nextTemplates: out.templates } : {}) }
     }
 
     case 'from': {
@@ -669,21 +692,28 @@ export function runCommand(input: CommandInput): CommandOutput {
       if (refs.length === 0) return { ok: false, text: USAGE }
       const out = applyTemplates(input.view, chosen, templates, refs)
       if (!out.ok) return { ok: false, text: out.text }
-      return { ok: true, text: out.text, nextView: out.view, nextTemplates: out.templates }
+      // `applyTemplates` returns the input library unchanged when every template
+      // was a duplicate, so reference equality is exactly "nothing to persist".
+      return {
+        ok: true,
+        text: out.text,
+        nextView: out.view,
+        ...(out.templates === templates ? {} : { nextTemplates: out.templates }),
+      }
     }
 
     case 'tmpl':
       return runTemplateCommand(args, tags, templates, input)
 
     case 'scope': {
-      const nextScope = args[0] as RuleScope | undefined
-      if (nextScope === undefined || !SCOPE_SET.has(nextScope)) return { ok: false, text: USAGE }
+      const nextScope = scopeArgument(scope, args)
+      if (nextScope === undefined) return { ok: false, text: USAGE }
       return { ok: true, text: `Default scope is now ${nextScope}.`, defaultScope: nextScope }
     }
 
     case 'clear': {
-      const clearScope = args[0] as RuleScope | undefined
-      if (clearScope === undefined || !SCOPE_SET.has(clearScope)) return { ok: false, text: USAGE }
+      const clearScope = scopeArgument(scope, args)
+      if (clearScope === undefined) return { ok: false, text: USAGE }
       return {
         ok: true,
         text: `Cleared ${clearScope} rules.`,

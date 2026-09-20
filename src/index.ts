@@ -11,7 +11,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { RuleScope } from './rules.ts'
-import { renderDigest, renderRules } from './rules.ts'
+import { digestOfText, renderRules } from './rules.ts'
 import { view } from './store.ts'
 import { handle, type RulesRuntime } from './command.ts'
 import { registerRulesApi } from './api.ts'
@@ -27,8 +27,10 @@ export const inject = ['agents', 'commands', 'fs', 'webServer', 'sessions']
 
 /** Policy for the rules plugin. Invalid values fail plugin load. */
 export interface Config {
-  /** Default scope that `/rules add|remove|...` edits when the line omits a scope keyword. */
-  scope: 'global' | 'session'
+  /** Default scope that `/baize-rules add|remove|…` edits when the line omits a
+   *  scope keyword. Any of the three scopes is a valid default, `project`
+   *  included: it resolves against the session's working directory. */
+  scope: RuleScope
   /** Model-visible byte budget; a tight budget sheds the broadest rules first. */
   maxBytes: number
   /** Override the global rules file path (default `$DSH_HOME/rules/global.json`). */
@@ -41,9 +43,11 @@ export interface Config {
   injectTags?: boolean
 }
 
-/** Schemastery validation for {@link Config}. */
+/** Schemastery validation for {@link Config}. Both `scope` and `maxBytes` are
+ *  required: a missing one is a configuration mistake, and silently falling back
+ *  to an undefined default scope is worse than failing the plugin load. */
 export const Config: z<Config> = z.object({
-  scope: z.union([z.const('global'), z.const('session')]),
+  scope: z.union([z.const('global'), z.const('session'), z.const('project')]).required(),
   maxBytes: z.number().required(),
   globalRulesPath: z.string(),
   injectAtEveryStep: z.boolean(),
@@ -54,15 +58,68 @@ export const Config: z<Config> = z.object({
 const lastInjected = /* @__PURE__ */ new WeakMap<Agent['session'], string>()
 
 /**
+ * Render the current rules once and digest that same string, or return undefined
+ * when nothing should be injected (no enabled rule survives the byte budget).
+ *
+ * Never throws: the store degrades a corrupt file to an empty scope and reports
+ * it as a `problem`, and anything unforeseen is contained here too. This runs on
+ * every conversation's pre-step, so a broken JSON file must cost the injection,
+ * not the step.
+ *
+ * @param ctx - plugin context (carries `fs`).
+ * @param agent - the agent whose session scopes the view.
+ * @param config - byte budget and tag-rendering policy.
+ * @param reportProblems - called with non-fatal read failures, deduplicated by the caller.
+ */
+async function renderFor(
+  ctx: Context,
+  agent: Agent,
+  config: Config,
+  reportProblems: (problems: readonly string[] | undefined) => void,
+): Promise<{ text: string; digest: string } | undefined> {
+  try {
+    const v = await view(ctx, agent, config)
+    reportProblems(v.problems)
+    const text = renderRules(v, config.maxBytes, { injectTags: config.injectTags === true })
+    if (text === undefined) return undefined
+    return { text, digest: await digestOfText(text) }
+  } catch (e) {
+    reportProblems([`injection failed: ${e instanceof Error ? e.message : String(e)}`])
+    return undefined
+  }
+}
+
+/** Best-effort warning through the host logger; a context without one is fine. */
+function warnMissing(ctx: Context, message: string): void {
+  try {
+    const logger = (ctx as Context & { logger?: { warn?: (m: string) => void } }).logger
+    logger?.warn?.(message)
+  } catch {
+    // Logging is never allowed to break injection.
+  }
+}
+
+/**
  * Register a prepended pre-step listener that injects the rendered rules as a
- * durable user message on conversation start, plus the `/rules` command.
+ * durable user message on conversation start, plus the `/baize-rules` command.
  * @param ctx - plugin context; listener and command dispose with it.
  * @param config - scope, budget, and redundancy policy.
  */
 export function apply(ctx: Context, config: Config): void {
-  // `/rules scope` mutates this process-visible default, so the command and the
-  // pre-step view always read the current choice.
+  // `/baize-rules scope` mutates this process-visible default, so the command and
+  // the pre-step view always read the current choice.
   const mutableScope: { scope: RuleScope } = { scope: config.scope }
+  // One warning per distinct problem per plugin lifetime: a corrupt file is read
+  // on every step, and repeating the same line each time would drown the log.
+  const reported = new Set<string>()
+  const reportProblems = (problems: readonly string[] | undefined): void => {
+    if (problems === undefined) return
+    for (const problem of problems) {
+      if (reported.has(problem)) continue
+      reported.add(problem)
+      warnMissing(ctx, `[${name}] ${problem}`)
+    }
+  }
 
   ctx.on('agent/pre-step', async (
     { agent, signal },
@@ -70,21 +127,18 @@ export function apply(ctx: Context, config: Config): void {
   ): Promise<PreStepDecision> => {
     const decision = await next()
     if (decision.kind === 'reject' || signal.aborted) return decision
-    const v = await view(ctx, agent, config)
-    const render = { injectTags: config.injectTags === true }
-    const text = renderRules(v, config.maxBytes, render)
-    if (text === undefined) return decision
-    const digest = await renderDigest(v, config.maxBytes, render)
+    const injected = await renderFor(ctx, agent, config, reportProblems)
+    if (injected === undefined) return decision
     const previous = lastInjected.get(agent.session)
-    if (!config.injectAtEveryStep && previous !== undefined && previous === digest) return decision
-    lastInjected.set(agent.session, digest ?? '')
+    if (!config.injectAtEveryStep && previous !== undefined && previous === injected.digest) return decision
+    lastInjected.set(agent.session, injected.digest)
     return {
       kind: 'enter',
       messages: [
         ...decision.messages,
         createUserMessage({
-          content: [{ type: 'text', text }],
-          source: { kind: 'plugin', plugin: name, form: 'snapshot', sections: [{ name, text }] },
+          content: [{ type: 'text', text: injected.text }],
+          source: { kind: 'plugin', plugin: name, form: 'snapshot', sections: [{ name, text: injected.text }] },
         }),
       ],
     }

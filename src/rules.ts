@@ -1,8 +1,8 @@
 /**
  * User-set rule data model, scope reconciliation, and the model-visible
- * rendering shared by the pre-step injection and the /rules command.
+ * rendering shared by the pre-step injection and the /baize-rules command.
  *
- * @module @deepseek-ai/dsh-rules/rules
+ * @module dsh-baize-rules/rules
  */
 
 export type RuleScope = 'global' | 'session' | 'project'
@@ -17,7 +17,7 @@ export const MAX_TAG_LENGTH = 24
  *  expressed in the text itself (e.g. "用中文写注释" vs "不要改测试"), so there is
  *  no separate kind tag. */
 export interface Rule {
-  /** Stable id minted once; the /rules command addresses rules by it. */
+  /** Stable id minted once; the /baize-rules command addresses rules by it. */
   readonly id: string
   readonly text: string
   /** Free-text classification tags. Panel-only by default: they drive grouping
@@ -45,11 +45,26 @@ export interface RuleTemplate {
   readonly uses?: number
 }
 
-/** Ordered, deduplicated rule sets per scope for a single session view. */
+/** Freshness tokens captured when a view was read, one per scope. Written back
+ *  as `FsWriteIntent` guards so a concurrent edit cannot be silently dropped.
+ *  Opaque here on purpose: `rules.ts` stays free of any `ctx.fs` dependency. */
+export interface ScopeVersions {
+  readonly global?: unknown
+  readonly session?: unknown
+  readonly project?: unknown
+}
+
+/** Ordered, deduplicated rule sets per scope for a single session view.
+ *
+ *  `problems` carries non-fatal read failures (a hand-edited or truncated store
+ *  file) so callers can show them; a corrupt scope degrades to empty rather
+ *  than throwing, because the pre-step of every conversation reads this view. */
 export interface RuleView {
   readonly global: readonly Rule[]
   readonly session: readonly Rule[]
   readonly project?: readonly Rule[]
+  readonly problems?: readonly string[]
+  readonly versions?: ScopeVersions
 }
 
 /** Case-insensitive identity key for one tag: `Frontend` and `frontend` are the
@@ -184,7 +199,12 @@ export async function renderDigest(
   options: RenderOptions = {},
 ): Promise<string | undefined> {
   const text = renderRules(view, budgetBytes, options)
-  if (text === undefined) return undefined
+  return text === undefined ? undefined : digestOfText(text)
+}
+
+/** SHA-1 of already-rendered text. The pre-step renders once and digests that
+ *  string, so it never pays for a second `renderRules`. */
+export async function digestOfText(text: string): Promise<string> {
   const bytes = new TextEncoder().encode(text)
   const hash = await crypto.subtle.digest('SHA-1', bytes)
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('')

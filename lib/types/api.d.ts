@@ -6,14 +6,23 @@
  *
  * Routes (json):
  *   GET  /baize-rules.api?sessionId=&project=
- *        -> { global, session, project, templates }
+ *        -> { global, session, project, templates, problems }
  *   POST /baize-rules.api { op?, sessionId, project, … }
- *        -> { ok, text, view, templates, … }
+ *        -> { ok, text, view, templates, problems, … }
  *
  * `op` defaults to `raw` — the pre-templates contract `{ raw, scope }` still
  * works unchanged. The other ops exist because the panel drives structured
  * edits (tags, template CRUD, template apply, import/export) that would be
  * awkward to express as command lines.
+ *
+ * Three properties this layer owns:
+ *   - **Origin.** The global rule file reaches every conversation's prompt, so a
+ *     request must come from this machine and, when the browser states one, from
+ *     the host's own origin. See {@link authorize}.
+ *   - **Body size.** The panel posts whole template libraries; a body is capped
+ *     at {@link MAX_BODY_BYTES} and a larger one is refused with 413.
+ *   - **Concurrency.** Every write carries the freshness token read with the
+ *     view, and a lost race answers 409 instead of overwriting silently.
  *
  * @module dsh-baize-rules/api
  */

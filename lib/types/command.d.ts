@@ -2,9 +2,16 @@
  * Thin dsh adapter for the `/baize-rules` command: feeds the live `view`, the
  * template library, and the current `defaultScope` into the dependency-free
  * decision core (`core.ts`), then persists the resulting `nextView` /
- * `nextTemplates` and any `/rules scope` default change. The file IO behind
+ * `nextTemplates` and any `/baize-rules scope` default change. The file IO behind
  * `tmpl export <file>` / `tmpl import <file>` also lives here — the core never
  * touches the filesystem.
+ *
+ * Persistence is deliberately narrow:
+ *  - only the scopes whose array identity actually changed are rewritten
+ *    (`core` builds each scope immutably, so an untouched scope keeps its
+ *    reference), which is also what keeps empty per-session files from piling up;
+ *  - every write carries the freshness token captured by `view`, so a concurrent
+ *    panel edit surfaces as a retryable conflict instead of a lost update.
  *
  * @module dsh-baize-rules/command
  */

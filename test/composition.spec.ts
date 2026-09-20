@@ -3,7 +3,7 @@
  * runtime surfaces it touches (cordis context, dsh-llm `createUserMessage`,
  * real `store`/`core` semantics) with minimal stub services for `fs`,
  * `commands`, and `agents`. Proves the plugin actually wires its pre-step
- * injection and `/rules` command registration, with the model-visible message
+ * injection and `/baize-rules` command registration, with the model-visible message
  * source correctly attributed to `plugin='baize-rules'` / form `snapshot`.
  *
  * @module dsh-baize-rules/composition.spec
@@ -59,7 +59,7 @@ async function preStep(h: Harness) {
 }
 
 describe('REAL-composition: plugin apply + pre-step injection', () => {
-  it('registers the /rules command', async () => {
+  it('registers the /baize-rules command', async () => {
     let name = ''
     const memory = new Map<string, string>()
     const rulesPath = '/__probe__/rules/global.json'
