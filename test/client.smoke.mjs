@@ -53,13 +53,19 @@ const DECLARED_MODULES = new Set([
 /** `const x = require(…)` whose binding is never referenced again: an undeclared
  *  import *and* dead code. This bundle once carried
  *  `const primitives = require('@deepseek-ai/dsh-client-ui-primitives')` that was
- *  never used and never declared — the shape this guard exists to keep out. */
+ *  never used and never declared — the shape this guard exists to keep out.
+ *
+ *  Whole declaration lines are removed before counting uses: the module
+ *  specifier itself usually contains the binding name (`…-ui-primitives`), so
+ *  counting the raw text would read that string as a use. */
 function deadRequireBindings(text) {
+  const declaration = /^[ \t]*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\([^\n]*\)[ \t]*;?[ \t]*$/gm
+  const body = text.replace(declaration, '')
   const dead = []
-  for (const match of text.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(/g)) {
+  for (const match of text.matchAll(declaration)) {
     const name = match[1]
-    const uses = text.match(new RegExp('\\b' + name + '\\b', 'g')) || []
-    if (uses.length <= 1) dead.push(name)
+    const uses = body.match(new RegExp('\\b' + name + '\\b', 'g')) || []
+    if (uses.length === 0) dead.push(name)
   }
   return dead
 }

@@ -265,11 +265,19 @@ On startup the plugin validates `Config` with `@deepseek-ai/schemastery`; an inv
 | `globalRulesPath` | `$DSH_HOME/rules/global.json` | Override the global rules file path |
 | `injectAtEveryStep` | `false` | Force re-render on every step (debugging); default only patches on change |
 | `injectTags` | `false` | When `true`, render tags into the model context (`- [flow,release] body`). Off by default: tags are a human-facing classifier, and injecting them spends budget and adds noise |
-| `apiOriginCheck` | `true` | The panel API accepts only requests from this machine whose browser `Origin` is the host's own. Set it to `false` when the web UI is reached through a reverse proxy or from another host — the proxy then owns authentication |
+| `apiOriginCheck` | `true` | Panel API accepts **same-machine, same-origin** requests only; disable when a reverse proxy fronts the web UI |
 
 > `scope` and `maxBytes` are **required by the schema**, not optional with an implicit fallback. Omitting
 > either fails the plugin load with an explicit error naming the missing field — silently defaulting an
 > undefined scope used to hide a broken configuration.
+>
+> **`apiOriginCheck` (default `true`).** The panel API answers only requests that come **from this machine**
+> and, when the browser states an `Origin`, from the **host's own origin** (or a local `file://` page,
+> which sends a `null` origin). Anything else is refused with `403`. The check exists because the global
+> rule file reaches **every** conversation's prompt, so "anything that can reach the port" must not be
+> enough. Turn it **off** when the web UI is reached through a **reverse proxy** or from **another host** —
+> such a request either arrives from a non-loopback address or carries an `Origin` that is not the host's
+> own, and would be refused. With the check disabled, authentication belongs to the proxy layer.
 
 ### Mount metadata (`cordis.patch.yml`)
 
@@ -374,7 +382,7 @@ API:
   | Status | Meaning |
   |---|---|
   | `400` | The request was refused: malformed JSON body, an empty `raw`, a missing `ruleId`/`text`, or an edit to a scope this request has no storage key for (no session, no cwd) |
-  | `403` | Origin refused: requests are accepted from **this machine only**, and a browser that states an `Origin` must be same-origin with the host or a local page (relaxable with `apiOriginCheck: false` behind a reverse proxy that authenticates) |
+  | `403` | Origin refused — the request is **not from this machine** (a non-loopback source), or the browser states an `Origin` that is neither the host's own nor a local page (cross-site). Behind a reverse proxy or when the UI is reached from another host, set `apiOriginCheck: false` and let the proxy authenticate |
   | `405` | Method other than `GET`/`POST` |
   | `409` | Concurrency conflict — the file changed since it was read, so nothing was written; reload and retry |
   | `413` | Request body larger than 1 MiB |
