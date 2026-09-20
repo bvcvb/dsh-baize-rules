@@ -10,7 +10,7 @@
 
 [dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) 的**会话 / 全局「必须做 / 不能做」要求**插件。名字取自**白泽**——传说中「通万物之情、晓万物之名、知万物之理」的神兽，用它来承载「用户给模型立下的行为基线」。
 
-![dsh web UI 里的「规则」面板——作用域标签（对话 / 项目 / 全局）、添加规则输入框与已生效规则列表](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
+![dsh web UI 里的「规则」面板——「规则 / 模板」双页、作用域标签（对话 / 项目 / 全局）、标签 chip 筛选、每行的启用 / 存为模板操作与已生效规则列表](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
 
 - 规则是**纯文本**，没有 `must`/`mustNot` 标记——「必须做 / 不能做」由正文语言表达（例如 `用中文写注释。`=必须，`不要删除测试。`=禁止）。
 - 注入发生在**会话起点**：把当前生效规则作为一条**持久** `user/message` 注入模型请求，套用 `<system-reminder>` 框架，来源标记为 `source.kind='plugin'`、`plugin='baize-rules'`。
@@ -140,7 +140,7 @@ dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 ds
 /baize-rules [list [scope]|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|tag|untag <id> <tag…>|save <id> [#tag…]|from <id|#tag>|tmpl <list|add|edit|rm|export|import>|scope <scope>|clear <scope>|export]
 ```
 
-![斜杠命令菜单里的 `/baize-rules` 条目：查看/增删改 会话或全局的 必须/禁止 要求](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
+![斜杠命令菜单里的 `/baize-rules` 条目：查看/增删改 会话或全局的 必须/禁止 要求，并管理可复用的规则模板](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
 
 | 子命令 | 语法 | 作用 |
 |---|---|---|

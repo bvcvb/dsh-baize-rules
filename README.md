@@ -10,7 +10,7 @@
 
 The name comes from **Baize (白泽)** — a mythical beast said to "understand the nature of all creatures, know the names of all things, and comprehend the principles of everything." It carries the behavioral baseline that the user sets for the model.
 
-![The rules panel in the dsh web UI — scope tabs (conversation / project / global), the add-rule field, and the active rules listed](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
+![The rules panel in the dsh web UI — the 规则 / 模板 panes, scope tabs (conversation / project / global), tag-chip filtering, per-row enable / save-as-template actions, and the active rules listed](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/001-rules-panel.png)
 
 - Rules are **plain text** with no `must`/`mustNot` markers — whether something is "must-do" or "must-not" is expressed by the language of the body itself (e.g. `Write comments in Chinese.` = must, `Do not delete the tests.` = must-not).
 - Injection happens at the **start of a conversation**: the currently active rules are injected into the model request as a **persistent** `user/message`, wrapped in a `<system-reminder>` frame, with `source.kind='plugin'` and `plugin='baize-rules'`.
@@ -145,7 +145,7 @@ All subcommands live under **`/baize-rules`**; no argument is equivalent to `lis
 /baize-rules [list [scope]|add <text>|remove <id>|edit <id> <text>|enable|disable <id>|tag|untag <id> <tag…>|save <id> [#tag…]|from <id|#tag>|tmpl <list|add|edit|rm|export|import>|scope <scope>|clear <scope>|export]
 ```
 
-![`/baize-rules` in the slash-command menu, described as "查看/增删改 会话或全局的 必须/禁止 要求"](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
+![`/baize-rules` in the slash-command menu, described as "查看/增删改 会话或全局的 必须/禁止 要求，并管理可复用的规则模板"](https://raw.githubusercontent.com/bvcvb/dsh-baize-rules/HEAD/assets/002-command.png)
 
 | Subcommand | Syntax | Purpose |
 |---|---|---|
