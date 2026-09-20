@@ -31,6 +31,11 @@ export interface Config {
      *  default: tags are a panel-side classification aid, and injecting them both
      *  spends the byte budget and adds noise to every request. */
     injectTags?: boolean;
+    /** When true (the default), the panel API accepts only requests from this
+     *  machine whose browser Origin is the host's own. Turn it off when the web UI
+     *  is reached through a reverse proxy or from another host — the proxy then
+     *  owns authentication. */
+    apiOriginCheck?: boolean;
 }
 /** Schemastery validation for {@link Config}. Both `scope` and `maxBytes` are
  *  required: a missing one is a configuration mistake, and silently falling back

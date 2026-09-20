@@ -1,8 +1,11 @@
 name: CI
 
-# Publishing is single-source: the `publish` job below runs on `v*` tags and is the ONLY
-# way releases reach npm. Do NOT run `npm publish` locally — it would conflict with the
-# tag-triggered publish for the same version.
+# Releases are cut from a `v*` tag and the `publish` job below is wired to it — but that
+# job needs the `NPM_TOKEN` secret, which this repository does not have, so a tag run
+# currently fails at the publish step with `npm error code ENEEDAUTH` (verified on v0.1.3,
+# v0.1.4 and v0.1.5). Until the secret exists, `npm publish --access public` run locally is
+# what actually ships a version; the tag run still serves as the build+test gate.
+# See README §Publishing.
 
 on:
   push:
@@ -27,7 +30,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
+      # The committed `lib/` must be exactly what `src/` compiles to: the package ships
+      # it, and without this step a stale artifact would ship unnoticed.
+      - run: git diff --exit-code -- lib
+      # The client half is hand-authored and outside `tsc`, so it gets its own gates:
+      # a syntax check, then the smoke test that also asserts every op the panel posts
+      # exists in the server's op dispatch.
+      - run: node --check lib/client.js
       - run: pnpm test
+      # Every path `package.json` promises (exports/main/types/files) must exist.
+      - run: pnpm check:exports
 
   publish:
     name: Publish to npm
@@ -48,7 +60,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm check:exports
+      # The tag is the version of record: never publish a package that disagrees with it.
+      - name: Assert the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

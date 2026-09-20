@@ -56,7 +56,12 @@ import {
   type FileRead,
 } from './store.ts'
 
-type RulesApiOptions = { globalRulesPath?: string }
+type RulesApiOptions = {
+  globalRulesPath?: string
+  /** Enforce {@link authorize}; off for reverse-proxy deployments where the proxy
+   *  authenticates callers and the request therefore arrives from loopback. */
+  originCheck?: boolean
+}
 
 /** Largest accepted POST body. A whole exported template library is far below
  *  this; anything bigger is a mistake or an attempt to exhaust memory. */
@@ -121,7 +126,8 @@ function originAllowed(origin: string, host: unknown): boolean {
  *  Note for reverse-proxy deployments: a proxied request arrives from the
  *  loopback address, so the proxy is what must authenticate callers.
  *  @returns the refusal reason, or undefined when the request may proceed. */
-function authorize(req: IncomingMessage, method: string): string | undefined {
+function authorize(req: IncomingMessage, method: string, enabled: boolean): string | undefined {
+  if (!enabled) return undefined
   if (method !== 'GET' && method !== 'POST') return undefined
   const remote = req.socket?.remoteAddress ?? ''
   if (remote.length > 0 && !LOOPBACK_ADDRESS.test(remote)) {
@@ -183,7 +189,7 @@ export function registerRulesApi(ctx: Context, options: RulesApiOptions = {}): (
     handler: async (req: IncomingMessage, res: ServerResponse) => {
       const method = req.method ?? ''
       const url = req.url ?? ''
-      const refused = authorize(req, method)
+      const refused = authorize(req, method, options.originCheck !== false)
       if (refused !== undefined) {
         sendJson(res, 403, { ok: false, text: refused })
         return

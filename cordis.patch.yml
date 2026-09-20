@@ -7,8 +7,14 @@
 # cordis.patch.yml mount line. The plugin's own `name='baize-rules'` is used for
 # the injected `user/message` source attribution.
 #
-# To tune default scope / budget, add a `config` to the inserted row
-# (mirrors the plugin `Config` schema).
+# To tune the defaults, add fields to the `config` of the inserted row (it
+# mirrors the plugin `Config` schema):
+#   scope: global | session | project   default scope for scope-less commands (required)
+#   maxBytes: <number>                  model-visible byte budget (required)
+#   injectAtEveryStep: <boolean>        re-publish the snapshot on every step (debug)
+#   injectTags: <boolean>               render `[tag,…]` prefixes into the model context
+#   apiOriginCheck: <boolean>           panel API accepts same-machine/same-origin only (default true;
+#                                       turn off when a reverse proxy fronts the web UI)
 - insert:
     - id: baize-rules
       name: 'dsh-baize-rules'

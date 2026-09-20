@@ -15,7 +15,9 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import * as plugin from '../src/index'
+import * as invariant from '../src/invariant'
 import { handle } from '../src/command'
 import { formatList, runCommand } from '../src/core'
 import { isStaleWrite, projectRulesPath } from '../src/store'
@@ -256,5 +258,180 @@ describe('0.2.1 · writes are guarded and minimal', () => {
     expect(out.kind).toBe('success')
     expect([...fs.files.keys()].some(k => k.includes('/rules/sessions/'))).toBe(false)
     expect([...fs.files.keys()].some(k => k.includes('/rules/projects/'))).toBe(false)
+  })
+})
+
+describe('0.2.1 · the invariant companion surfaces a corrupt store', () => {
+  /** Mount only the companion and capture the installer it registers. */
+  async function installer(fs: FakeFs) {
+    const captured: { installer: (ctx: unknown, fail: (m: string) => void) => unknown }[] = []
+    const c = new Context()
+    c.provide('fs', fs.service)
+    c.provide('invariants', {
+      register: (_name: string, install: never) => { captured.push({ installer: install }); return () => {} },
+    })
+    ctx = c
+    await c.plugin(invariant)
+    return captured[0].installer
+  }
+
+  it('fails with the file path when a store file cannot be read', async () => {
+    const globalPath = dshHomePath('rules', 'global.json')
+    const fs = makeFs({ [globalPath]: '{ not json' })
+    const install = await installer(fs)
+    const failures: string[] = []
+    await install({ fs: fs.service }, (m: string) => { failures.push(m) })
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toContain('global rules')
+    expect(failures[0]).toContain(globalPath)
+  })
+
+  it('stays silent for a healthy store', async () => {
+    const fs = makeFs({
+      [dshHomePath('rules', 'global.json')]: rulesJson(rule('g1', '全局规则')),
+      [dshHomePath('rules', 'templates.json')]: '[]',
+    })
+    const install = await installer(fs)
+    const failures: string[] = []
+    await install({ fs: fs.service }, (m: string) => { failures.push(m) })
+    expect(failures).toEqual([])
+  })
+})
+
+describe('0.2.1 · the panel API guards its own port', () => {
+  const globalPath = '/__probe__/rules/global.json'
+
+  /** Minimal IncomingMessage stand-in: what `readBody` + `authorize` actually use. */
+  function fakeReq(o: {
+    method: string
+    url: string
+    body?: string
+    remoteAddress?: string
+    origin?: string
+  }) {
+    const req = {
+      method: o.method,
+      url: o.url,
+      headers: {
+        host: '127.0.0.1:3080',
+        ...(o.origin === undefined ? {} : { origin: o.origin }),
+      },
+      socket: { remoteAddress: o.remoteAddress ?? '127.0.0.1' },
+      on(event: string, cb: (chunk?: unknown) => void) {
+        if (event === 'data' && o.body !== undefined) queueMicrotask(() => cb(o.body))
+        if (event === 'end') queueMicrotask(() => cb())
+        return req
+      },
+      destroy() {},
+    }
+    return req
+  }
+
+  function fakeRes() {
+    const captured = { status: 0, body: '' }
+    return {
+      captured,
+      res: {
+        writeHead(status: number) { captured.status = status },
+        end(body: string) { captured.body = body },
+      },
+    }
+  }
+
+  async function mountApi(fs: FakeFs, config: Record<string, unknown> = {}) {
+    let route: { handler: (req: unknown, res: unknown) => Promise<void> } | undefined
+    const c = new Context()
+    c.provide('fs', fs.service)
+    c.provide('commands', { register: () => () => {} })
+    c.provide('agents', {})
+    c.provide('sessions', { get: () => undefined })
+    c.provide('webServer', { register: (r: never) => { route = r; return () => {} } })
+    ctx = c
+    void c.plugin(plugin, {
+      scope: 'session',
+      maxBytes: 8192,
+      globalRulesPath: globalPath,
+      ...config,
+    })
+    await c.fiber
+    return route!
+  }
+
+  const parse = (body: string) => JSON.parse(body) as Record<string, unknown>
+
+  it('refuses a request that did not come from this machine', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }))
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({ method: 'GET', url: '/baize-rules.api', remoteAddress: '10.0.0.9' }), res)
+    expect(captured.status).toBe(403)
+    expect(parse(captured.body).text).toContain('this machine only')
+  })
+
+  it('refuses a cross-origin browser request', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }))
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({ method: 'POST', url: '/baize-rules.api', body: '{}', origin: 'https://evil.example' }), res)
+    expect(captured.status).toBe(403)
+    expect(parse(captured.body).text).toContain('cross-origin')
+  })
+
+  it('serves a same-origin GET with templates and problems', async () => {
+    const route = await mountApi(makeFs({
+      [globalPath]: '{ broken',
+      [dshHomePath('rules', 'templates.json')]: '[]',
+    }))
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({ method: 'GET', url: '/baize-rules.api?sessionId=s1' }), res)
+    expect(captured.status).toBe(200)
+    const body = parse(captured.body)
+    expect(body.templates).toEqual([])
+    expect((body.problems as string[])[0]).toContain('global rules')
+  })
+
+  it('accepts a structured rule.add and persists it', async () => {
+    const fs = makeFs({ [globalPath]: rulesJson() })
+    const route = await mountApi(fs)
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({
+      method: 'POST',
+      url: '/baize-rules.api',
+      body: JSON.stringify({ op: 'rule.add', scope: 'global', text: '只用 pnpm' }),
+    }), res)
+    expect(captured.status).toBe(200)
+    expect(parse(captured.body).ok).toBe(true)
+    expect(JSON.parse(fs.files.get(globalPath)!.content)[0].text).toBe('只用 pnpm')
+  })
+
+  it('answers 409 when the write loses a race', async () => {
+    const sessionPath = dshHomePath('rules', 'sessions', 's1.json')
+    const fs = makeFs({ [globalPath]: rulesJson(), [sessionPath]: rulesJson() }, sessionPath)
+    const route = await mountApi(fs)
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({
+      method: 'POST',
+      url: '/baize-rules.api',
+      body: JSON.stringify({ op: 'rule.add', scope: 'session', sessionId: 's1', text: '新规则' }),
+    }), res)
+    expect(captured.status).toBe(409)
+    expect(parse(captured.body).text).toContain('changed in another window')
+  })
+
+  it('rejects an oversized body with 413', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }))
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({
+      method: 'POST',
+      url: '/baize-rules.api',
+      body: 'x'.repeat(1024 * 1024 + 16),
+    }), res)
+    expect(captured.status).toBe(413)
+    expect(parse(captured.body).text).toContain('exceeds')
+  })
+
+  it('can be relaxed for a reverse-proxy deployment', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }), { apiOriginCheck: false })
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({ method: 'GET', url: '/baize-rules.api', remoteAddress: '10.0.0.9' }), res)
+    expect(captured.status).toBe(200)
   })
 })

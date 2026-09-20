@@ -6,11 +6,20 @@
  * exports `name` / `inject=['invariants']` / `apply`, and registers itself via
  * `ctx.invariants.register(PACKAGE_NAME, install)`.
  *
+ * The check is real now: the runtime store deliberately degrades a corrupt file
+ * to an empty scope so that a hand-edited file cannot fail every step of every
+ * conversation (see `store.ts`). That is the right runtime behaviour — but it is
+ * also silent, so this companion is where the damage becomes visible: with
+ * invariants enabled, a store file that exists and cannot be read fails the
+ * diagnostic with its path and reason instead of quietly costing someone their
+ * rules.
+ *
  * @module dsh-baize-rules/invariant
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { InvariantFailure, InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import { storeProblems } from './store.ts'
 
 const PACKAGE_NAME = 'dsh-baize-rules'
 
@@ -20,13 +29,22 @@ export const name = 'baize-rules-invariant'
 export const inject = ['invariants']
 
 /**
- * M1 hook: install a real check that any rules-tagged `user/message` in the
- * session log carries the rules plugin's own source marker and reconstructs from
- * the current rule set. For now it is an explainable no-op so it never blocks a
- * session; the reference implementation's naive `registerInvariant` (a nonexistent
- * export from a wrong package name) is replaced by this contract-correct shape.
+ * Check that every singleton store file this plugin owns is readable as the JSON
+ * array it is supposed to be. Reported through `fail`, so a violation carries the
+ * package attribution the invariant registry expects; paths are included because
+ * "which file" is the only actionable part of the message.
+ *
+ * Only `$DSH_HOME/rules/global.json` and `$DSH_HOME/rules/templates.json` are
+ * checked — session and project stores need a live session, and a plugin invariant
+ * cannot know the `globalRulesPath` override another instance was configured with.
  */
-const install: InvariantInstaller = () => {}
+const install: InvariantInstaller = Object.assign(
+  async (ctx: Context, fail: InvariantFailure): Promise<void> => {
+    const problems = await storeProblems(ctx)
+    for (const problem of problems) fail(problem)
+  },
+  { inject: ['fs'] as const },
+)
 
 /**
  * Register this package's invariant companion.

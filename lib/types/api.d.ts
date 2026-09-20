@@ -29,6 +29,9 @@
 import type { Context } from '@deepseek-ai/cordis';
 type RulesApiOptions = {
     globalRulesPath?: string;
+    /** Enforce {@link authorize}; off for reverse-proxy deployments where the proxy
+     *  authenticates callers and the request therefore arrives from loopback. */
+    originCheck?: boolean;
 };
 /** Register the rules panel API on the host web server. */
 export declare function registerRulesApi(ctx: Context, options?: RulesApiOptions): () => void;

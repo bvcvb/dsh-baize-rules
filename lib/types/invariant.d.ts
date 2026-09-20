@@ -6,6 +6,14 @@
  * exports `name` / `inject=['invariants']` / `apply`, and registers itself via
  * `ctx.invariants.register(PACKAGE_NAME, install)`.
  *
+ * The check is real now: the runtime store deliberately degrades a corrupt file
+ * to an empty scope so that a hand-edited file cannot fail every step of every
+ * conversation (see `store.ts`). That is the right runtime behaviour — but it is
+ * also silent, so this companion is where the damage becomes visible: with
+ * invariants enabled, a store file that exists and cannot be read fails the
+ * diagnostic with its path and reason instead of quietly costing someone their
+ * rules.
+ *
  * @module dsh-baize-rules/invariant
  */
 import type { Context } from '@deepseek-ai/cordis';

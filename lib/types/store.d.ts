@@ -80,6 +80,18 @@ export declare function readTemplatesWithVersion(ctx: Context): Promise<FileRead
 export declare function readTemplates(ctx: Context): Promise<RuleTemplate[]>;
 /** Replace the shared template library in its durable file. */
 export declare function writeTemplates(ctx: Context, templates: readonly RuleTemplate[], guard?: unknown): Promise<void>;
+/** Diagnostics entry point for the invariant companion: every store file that
+ *  exists but cannot be read as a rules/templates array.
+ *
+ *  Runtime reading degrades such a file to an empty scope (see {@link readArrayFile}),
+ *  which keeps conversations working — and also keeps the damage invisible until
+ *  someone asks. This is what asks. It never throws, so an invariant can report the
+ *  problems it finds instead of failing on the way to them.
+ *
+ *  Only the two singleton files are checked: session and project rules need a live
+ *  session, so their health is reported on the paths that read them (the command
+ *  output and the panel). */
+export declare function storeProblems(ctx: Context): Promise<readonly string[]>;
 /** Whether a failed write lost an optimistic-concurrency race: someone else
  *  created or edited the same file between our read and our write. Callers turn
  *  this into a 409 (HTTP) or a "reload and retry" message (command). */

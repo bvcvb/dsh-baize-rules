@@ -41,6 +41,11 @@ export interface Config {
    *  default: tags are a panel-side classification aid, and injecting them both
    *  spends the byte budget and adds noise to every request. */
   injectTags?: boolean
+  /** When true (the default), the panel API accepts only requests from this
+   *  machine whose browser Origin is the host's own. Turn it off when the web UI
+   *  is reached through a reverse proxy or from another host — the proxy then
+   *  owns authentication. */
+  apiOriginCheck?: boolean
 }
 
 /** Schemastery validation for {@link Config}. Both `scope` and `maxBytes` are
@@ -52,9 +57,19 @@ export const Config: z<Config> = z.object({
   globalRulesPath: z.string(),
   injectAtEveryStep: z.boolean(),
   injectTags: z.boolean(),
+  apiOriginCheck: z.boolean(),
 })
 
-/** Per-session digest of the last injected rules, used to suppress duplicate injection. */
+/** Per-session digest of the last injected rules, used to suppress duplicate
+ *  injection within this process.
+ *
+ *  Correctness does not depend on it: the message is published with
+ *  `form: 'snapshot'`, and the host supersedes an earlier snapshot from the same
+ *  producer with the later one (see `ContextForm` in `@deepseek-ai/dsh-llm`). What
+ *  this saves is one redundant durable message per step. It lives in memory on
+ *  purpose — a resumed session re-publishes once and the host collapses it. Only
+ *  the rendered text is digested, so with `injectTags` off a pure retag does not
+ *  re-publish. */
 const lastInjected = /* @__PURE__ */ new WeakMap<Agent['session'], string>()
 
 /**
@@ -161,5 +176,8 @@ export function apply(ctx: Context, config: Config): void {
   }, 'baize-rules lifecycle')
 
   // Host HTTP API for the rules panel (client reads/writes here).
-  ctx.effect(() => registerRulesApi(ctx, { globalRulesPath: config.globalRulesPath }), 'baize-rules api')
+  ctx.effect(() => registerRulesApi(ctx, {
+    globalRulesPath: config.globalRulesPath,
+    originCheck: config.apiOriginCheck !== false,
+  }), 'baize-rules api')
 }
