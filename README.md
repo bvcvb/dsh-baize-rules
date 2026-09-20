@@ -27,6 +27,7 @@ The name comes from **Baize (白泽)** — a mythical beast said to "understand 
 | **Specificity wins** | Render order `project > session > global`; when the byte budget is tight, the more specific rules are preserved first |
 | **A corrupt file never breaks a step** | Rule files are read tolerantly: a broken or hand-edited file degrades that scope to empty and surfaces a `problems` warning, instead of failing the conversation |
 | **Deduplication** | Suppresses duplicate injection by SHA-1 digest of the rendered text; optional `injectAtEveryStep` forces a refresh on every step |
+| **Stays present in long threads** | The snapshot is republished when the text changes, after a session lifecycle change (`startup` / `resume` / `clear` / `compact`), and once the last copy is `refreshAfterSteps` steps old (default 20) — so the rules are never left behind only at the top of a long conversation |
 | **Escape protection** | Literal `</system-reminder>` in rule bodies is escaped so user text can't close the plugin's frame |
 | **Command + API share the same source** | The `/baize-rules` command and the front-end panel use the same store/core, so there is always a single source of truth |
 | **Tags** | Rules can carry free-text tags (`flow`, `#frontend`) that the panel filters by. Panel-only by default — tags cost no model-context budget (`injectTags` opts in) |
@@ -55,7 +56,7 @@ Both inject a sourced `user/message` framed with `<system-reminder>`, and both c
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.2.1
+dsh plugin --profile web add dsh-baize-rules@0.2.2
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```
@@ -79,7 +80,7 @@ If the entry lingers in the profile's `dsh.profile.bundles`, delete that line fr
 Install into a **separate profile** so your currently running dsh stays unchanged:
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.1
+dsh plugin --profile smoke add dsh-baize-rules@0.2.2
 dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
 ```
 
@@ -226,6 +227,8 @@ When no scope is given, the default set by `/baize-rules scope` is used (initial
 - **All three scopes are injected**: `project > session > global`, specific first. `project` rules are read from the session's working directory, so they join the view (and the model context) whenever the session declares a `cwd`; they are rendered under the header `Project requirements (this directory only):`.
 - **Specificity wins**: when the budget is tight the broader `global` rules are trimmed first.
 - **Deduplication**: a SHA-1 digest is computed over the rendered text; unchanged rules aren't re-injected. `injectAtEveryStep:true` forces a refresh on each step.
+- **A fresh copy after a session lifecycle change**: `agent/session-start` (`startup` / `resume` / `clear` / `compact`) drops that session's record, so the next step publishes the full rules again — a compacted or cleared session cannot be left without them, which is the one case where "inject once at the start" could lose them for good.
+- **A fresh copy every `refreshAfterSteps` steps**: once the last published copy is that many steps old it is republished even when the text is byte-identical (default **20**, `0` disables the periodic refresh). A step counter that restarts after compaction counts as stale as well. Because the message is a snapshot, the model still sees a single copy — this only moves it back to where the conversation is now.
 - **Escape**: a literal `</system-reminder>` in a body is escaped via `escapeReminder`.
 - **Tags stay out of the model**: tags are **not** injected by default (`injectTags:false`), so tagging or retagging a rule neither changes the text the model sees nor triggers a redundant re-injection.
 - **Empty / fully trimmed**: when there are no rules, or the budget cuts all of them, it returns `undefined` (i.e. does not inject that message).
@@ -264,6 +267,7 @@ On startup the plugin validates `Config` with `@deepseek-ai/schemastery`; an inv
 | `maxBytes` | — (**schema-required**) | Byte cap visible to the model; trimmed with specificity-wins when exceeded |
 | `globalRulesPath` | `$DSH_HOME/rules/global.json` | Override the global rules file path |
 | `injectAtEveryStep` | `false` | Force re-render on every step (debugging); default only patches on change |
+| `refreshAfterSteps` | `20` | Republish the snapshot once the last copy is this many steps old, even when nothing changed, so a long conversation never keeps the rules only at its top. `0` disables the periodic refresh |
 | `injectTags` | `false` | When `true`, render tags into the model context (`- [flow,release] body`). Off by default: tags are a human-facing classifier, and injecting them spends budget and adds noise |
 | `apiOriginCheck` | `true` | Panel API accepts **same-machine, same-origin** requests only; disable when a reverse proxy fronts the web UI |
 

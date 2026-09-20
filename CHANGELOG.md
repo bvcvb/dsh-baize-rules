@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.2] - 2026-09-20
+
+### Added
+- **The rules now stay present in long conversations.** A snapshot whose text never changes used to be published once, at the start of the session, and then never again. Two refresh rules sit on top of that:
+  - **A fresh copy after a session lifecycle change.** `agent/session-start` (`startup` / `resume` / `clear` / `compact`) drops that session's injection record, so the next step publishes a fresh full copy into the conversation as it now stands. This closes the one gap that could lose the rules for good: a compacted or cleared session may no longer carry the earlier message, and nothing used to bring it back.
+  - **A fresh copy every `refreshAfterSteps` steps.** Once the last published copy is that many steps old it is republished even when the rendered text is byte-identical (default **20**, `0` disables the periodic refresh), so the rules are never stranded at the very top of a long thread. A step counter that restarts after compaction counts as stale too. Because the message is published as a `snapshot`, the model still sees a single copy — the refresh only moves it back to where the conversation is now.
+- `refreshAfterSteps` joins the documented plugin config (README EN + ZH and `cordis.patch.yml`).
+- `test/refresh.spec.ts` (7 cases) covers the policy: unchanged text stays quiet, a custom threshold and the default 20 republish, `0` disables, restarted numbering republishes, `compact` / `resume` / `clear` each republish, and a rule edit still publishes immediately.
+
+### Changed
+- The per-session injection record now carries the step that produced the last publication (`{ digest, step }`) instead of only the digest — that step is what the staleness comparison measures. The record is still in-memory; the two refresh rules above are what make that acceptable.
+
 ## [0.2.1] - 2026-09-20
 
 ### Changed

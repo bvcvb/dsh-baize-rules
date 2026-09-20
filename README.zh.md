@@ -27,6 +27,7 @@
 | **具体优先** | 渲染顺序 `project > session > global`；字节预算受压时优先保留更具体的规则 |
 | **坏文件不再打断对话** | 规则文件采用容错读取：损坏或被手改坏的文件只会让该作用域降级为空 + 一条 `problems` 告警，不会让对话步骤失败 |
 | **去重** | 按渲染文本 SHA-1 digest 抑制重复注入；`injectAtEveryStep` 可选每步强制刷新 |
+| **长对话里始终在场** | 以下三种情况会重新发布一份快照：文本变化时、会话生命周期变化（`startup`/`resume`/`clear`/`compact`）后、以及距上次发布满 `refreshAfterSteps` 步（默认 20）时——规则不会只留在长对话的最开头 |
 | **防逃逸** | 正文里的字面 `</system-reminder>` 会被转义，防止用户文本关闭插件框架 |
 | **命令 + API 同源** | `/baize-rules` 命令与前端面板共用同一套 store/core，改动始终同一真值 |
 | **标签分类** | 规则可带文字标签（`流程`、`#前端`…），面板按标签筛选。默认**只用于分类**，不占模型上下文预算（`injectTags` 可开） |
@@ -55,7 +56,7 @@ dsh 自带 `@deepseek-ai/dsh-agent-instructions`，负责加载工作区指令�
 
 ```bash
 # 从 npm 安装到 web profile（版本以发布后的实际版本为准）
-dsh plugin --profile web add dsh-baize-rules@0.2.1
+dsh plugin --profile web add dsh-baize-rules@0.2.2
 pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 dsh --profile web
 ```
@@ -77,7 +78,7 @@ pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 装到**另一个 profile**，正在运行的 dsh 完全不受影响：
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.1
+dsh plugin --profile smoke add dsh-baize-rules@0.2.2
 dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 dsh
 ```
 
@@ -217,6 +218,8 @@ dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 ds
 - **三个作用域都会注入**：`project > session > global`，具体在前。`project` 规则按会话工作目录读取，因此只要会话声明了 `cwd` 就会进入视图（也进入模型上下文），渲染在 `Project requirements (this directory only):` 标题下。
 - **具体优先**：预算受限时优先裁剪较宽泛的 `global` 规则。
 - **去重**：对渲染文本算 SHA-1 digest，规则不变则不重复注入；`injectAtEveryStep:true` 时每步强制刷新。
+- **会话生命周期变化后补发一份**：`agent/session-start`（`startup` / `resume` / `clear` / `compact`）会清掉该会话的记录，下一步就重新发布完整规则——被压缩或清空的会话不会「丢掉」这些规则，而这正是「只在开头注入一次」唯一可能永久失效的场景。
+- **每 `refreshAfterSteps` 步补发一份**：距上次发布的副本满这么多步时，即使渲染文本一字未改也会重新发布（默认 **20**，`0` 关闭周期刷新）。压缩后步号重新计数也算「过期」。因为消息是快照，模型侧仍然只看到一份——这只是把它挪回对话「现在」的位置。
 - **转义**：正文里的 `</system-reminder>` 会被 `escapeReminder` 转义。
 - **标签不入模型**：标签默认**不**注入（`injectTags:false`），所以给规则打标签/改标签既不改变模型看到的文本，也不会触发重复注入。
 - **空 / 全裁**：无规则、或预算裁光所有规则时返回 `undefined`（即不注入该消息）。
@@ -255,6 +258,7 @@ Global requirements:
 | `maxBytes` | —（**schema 必填**） | 模型可见字节上限；超出时按「具体优先」裁剪 |
 | `globalRulesPath` | `$DSH_HOME/rules/global.json` | 覆盖全局规则文件路径 |
 | `injectAtEveryStep` | `false` | 每步强制重渲（调试用）；默认为仅变化时打补丁 |
+| `refreshAfterSteps` | `20` | 距上次发布的副本满这么多步就重新发布一份（即使文本未变），避免长对话里规则只留在最开头。`0` 关闭周期刷新 |
 | `injectTags` | `false` | 为 `true` 时把标签渲染进模型上下文（`- [流程,发布] 正文`）。默认关闭：标签是给人看的分类器，注入会占预算并添噪声 |
 | `apiOriginCheck` | `true` | 面板 API 只接受**本机 + 同源**请求；当 Web UI 由反向代理前置时关闭 |
 

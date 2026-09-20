@@ -15,6 +15,8 @@
 #   injectTags: <boolean>               render `[tag,…]` prefixes into the model context
 #   apiOriginCheck: <boolean>           panel API accepts same-machine/same-origin only (default true;
 #                                       turn off when a reverse proxy fronts the web UI)
+#   refreshAfterSteps: <number>         republish the snapshot once the last copy is this many steps
+#                                       old (default 20; 0 disables the periodic refresh)
 - insert:
     - id: baize-rules
       name: 'dsh-baize-rules'
