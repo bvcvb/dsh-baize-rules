@@ -36,6 +36,10 @@ export interface Config {
      *  is reached through a reverse proxy or from another host — the proxy then
      *  owns authentication. */
     apiOriginCheck?: boolean;
+    /** Republish the snapshot after this many steps even when nothing changed, so
+     *  the rules never sit only at the very start of a long conversation. `0`
+     *  disables the periodic refresh. Defaults to 20. */
+    refreshAfterSteps?: number;
 }
 /** Schemastery validation for {@link Config}. Both `scope` and `maxBytes` are
  *  required: a missing one is a configuration mistake, and silently falling back
