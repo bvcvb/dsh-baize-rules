@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.3] - 2026-09-22
+
+### Changed
+- **The panel API origin check is off by default now** (`apiOriginCheck`, introduced in 0.2.1 with `default true`). The check refuses every request that does not arrive from loopback, and a web UI behind a **reverse proxy** is precisely that case — the request arrives from the proxy's address, not from loopback. So the old default silently broke the panel for the ordinary proxied deployment: `/baize-rules.api` answered `403 requests are accepted from this machine only` while the rest of the UI kept working (0.2.0 and earlier had no check and were unaffected). The check itself is **unchanged and still available**: set `apiOriginCheck: true` to enforce same-machine/same-origin only — appropriate when the port is reachable by others and no proxy layer authenticates the callers. Left off (the default), authentication belongs to the transport (dsh's own token) and to the proxy.
+- Tests split by that default: one case asserts a non-loopback, cross-origin caller is **accepted** without config, and the two refusal cases (foreign address, cross-site `Origin`) now mount with `apiOriginCheck: true`.
+- Docs (`README.md`, `README.zh.md`, `cordis.patch.yml`) carry the new default, and the `403` row of the API failure table is marked as appearing **only** with the check switched on.
+
 ## [0.2.2] - 2026-09-20
 
 ### Added

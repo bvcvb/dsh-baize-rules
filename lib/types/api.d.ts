@@ -29,8 +29,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 type RulesApiOptions = {
     globalRulesPath?: string;
-    /** Enforce {@link authorize}; off for reverse-proxy deployments where the proxy
-     *  authenticates callers and the request therefore arrives from loopback. */
+    /** Enforce {@link authorize}. Off unless the plugin config turns it on: behind a
+     *  reverse proxy the request arrives from the proxy's address, not from loopback. */
     originCheck?: boolean;
 };
 /** Register the rules panel API on the host web server. */

@@ -359,16 +359,28 @@ describe('0.2.1 · the panel API guards its own port', () => {
 
   const parse = (body: string) => JSON.parse(body) as Record<string, unknown>
 
-  it('refuses a request that did not come from this machine', async () => {
+  it('does not check the caller unless the config asks for it (default off)', async () => {
     const route = await mountApi(makeFs({ [globalPath]: rulesJson() }))
+    const { captured, res } = fakeRes()
+    await route.handler(fakeReq({
+      method: 'GET',
+      url: '/baize-rules.api',
+      remoteAddress: '10.0.0.9',
+      origin: 'https://evil.example',
+    }), res)
+    expect(captured.status).toBe(200)
+  })
+
+  it('refuses a request that did not come from this machine when switched on', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }), { apiOriginCheck: true })
     const { captured, res } = fakeRes()
     await route.handler(fakeReq({ method: 'GET', url: '/baize-rules.api', remoteAddress: '10.0.0.9' }), res)
     expect(captured.status).toBe(403)
     expect(parse(captured.body).text).toContain('this machine only')
   })
 
-  it('refuses a cross-origin browser request', async () => {
-    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }))
+  it('refuses a cross-origin browser request when switched on', async () => {
+    const route = await mountApi(makeFs({ [globalPath]: rulesJson() }), { apiOriginCheck: true })
     const { captured, res } = fakeRes()
     await route.handler(fakeReq({ method: 'POST', url: '/baize-rules.api', body: '{}', origin: 'https://evil.example' }), res)
     expect(captured.status).toBe(403)
@@ -428,7 +440,7 @@ describe('0.2.1 · the panel API guards its own port', () => {
     expect(parse(captured.body).text).toContain('exceeds')
   })
 
-  it('can be relaxed for a reverse-proxy deployment', async () => {
+  it('accepts a proxied caller when the check is explicitly off', async () => {
     const route = await mountApi(makeFs({ [globalPath]: rulesJson() }), { apiOriginCheck: false })
     const { captured, res } = fakeRes()
     await route.handler(fakeReq({ method: 'GET', url: '/baize-rules.api', remoteAddress: '10.0.0.9' }), res)

@@ -41,10 +41,11 @@ export interface Config {
    *  default: tags are a panel-side classification aid, and injecting them both
    *  spends the byte budget and adds noise to every request. */
   injectTags?: boolean
-  /** When true (the default), the panel API accepts only requests from this
-   *  machine whose browser Origin is the host's own. Turn it off when the web UI
-   *  is reached through a reverse proxy or from another host — the proxy then
-   *  owns authentication. */
+  /** When true, the panel API accepts only requests from this machine whose
+   *  browser Origin is the host's own; anything else is refused with `403`. Off by
+   *  default: the web UI is routinely reached through a reverse proxy, where the
+   *  request arrives from the proxy's address instead of loopback. Turn it on when
+   *  the port is reachable by others and no proxy layer authenticates the callers. */
   apiOriginCheck?: boolean
   /** Republish the snapshot after this many steps even when nothing changed, so
    *  the rules never sit only at the very start of a long conversation. `0`
@@ -214,6 +215,6 @@ export function apply(ctx: Context, config: Config): void {
   // Host HTTP API for the rules panel (client reads/writes here).
   ctx.effect(() => registerRulesApi(ctx, {
     globalRulesPath: config.globalRulesPath,
-    originCheck: config.apiOriginCheck !== false,
+    originCheck: config.apiOriginCheck === true,
   }), 'baize-rules api')
 }

@@ -56,7 +56,7 @@ Both inject a sourced `user/message` framed with `<system-reminder>`, and both c
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.2.2
+dsh plugin --profile web add dsh-baize-rules@0.2.3
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```
@@ -80,7 +80,7 @@ If the entry lingers in the profile's `dsh.profile.bundles`, delete that line fr
 Install into a **separate profile** so your currently running dsh stays unchanged:
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.2
+dsh plugin --profile smoke add dsh-baize-rules@0.2.3
 dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
 ```
 
@@ -269,19 +269,20 @@ On startup the plugin validates `Config` with `@deepseek-ai/schemastery`; an inv
 | `injectAtEveryStep` | `false` | Force re-render on every step (debugging); default only patches on change |
 | `refreshAfterSteps` | `20` | Republish the snapshot once the last copy is this many steps old, even when nothing changed, so a long conversation never keeps the rules only at its top. `0` disables the periodic refresh |
 | `injectTags` | `false` | When `true`, render tags into the model context (`- [flow,release] body`). Off by default: tags are a human-facing classifier, and injecting them spends budget and adds noise |
-| `apiOriginCheck` | `true` | Panel API accepts **same-machine, same-origin** requests only; disable when a reverse proxy fronts the web UI |
+| `apiOriginCheck` | `false` | When `true`, the panel API accepts **same-machine, same-origin** requests only; off by default so a reverse-proxied web UI keeps working |
 
 > `scope` and `maxBytes` are **required by the schema**, not optional with an implicit fallback. Omitting
 > either fails the plugin load with an explicit error naming the missing field — silently defaulting an
 > undefined scope used to hide a broken configuration.
 >
-> **`apiOriginCheck` (default `true`).** The panel API answers only requests that come **from this machine**
-> and, when the browser states an `Origin`, from the **host's own origin** (or a local `file://` page,
-> which sends a `null` origin). Anything else is refused with `403`. The check exists because the global
+> **`apiOriginCheck` (default `false`).** When switched **on**, the panel API answers only requests that
+> come **from this machine** and, when the browser states an `Origin`, from the **host's own origin** (or a
+> local `file://` page, which sends a `null` origin); anything else is refused with `403`. It is **off by
+> default** because the web UI is routinely reached through a **reverse proxy**, where the request arrives
+> from the proxy's address instead of loopback and the panel would break. Turn it **on** when the port is
+> reachable by others and no proxy layer authenticates the callers — the check exists because the global
 > rule file reaches **every** conversation's prompt, so "anything that can reach the port" must not be
-> enough. Turn it **off** when the web UI is reached through a **reverse proxy** or from **another host** —
-> such a request either arrives from a non-loopback address or carries an `Origin` that is not the host's
-> own, and would be refused. With the check disabled, authentication belongs to the proxy layer.
+> enough. With the check off, authentication belongs to the transport (dsh's own token) and the proxy.
 
 ### Mount metadata (`cordis.patch.yml`)
 
@@ -386,7 +387,7 @@ API:
   | Status | Meaning |
   |---|---|
   | `400` | The request was refused: malformed JSON body, an empty `raw`, a missing `ruleId`/`text`, or an edit to a scope this request has no storage key for (no session, no cwd) |
-  | `403` | Origin refused — the request is **not from this machine** (a non-loopback source), or the browser states an `Origin` that is neither the host's own nor a local page (cross-site). Behind a reverse proxy or when the UI is reached from another host, set `apiOriginCheck: false` and let the proxy authenticate |
+  | `403` | Origin refused — only with `apiOriginCheck: true`: the request is **not from this machine** (a non-loopback source), or the browser states an `Origin` that is neither the host's own nor a local page (cross-site). Off by default, so a reverse-proxied web UI never sees this |
   | `405` | Method other than `GET`/`POST` |
   | `409` | Concurrency conflict — the file changed since it was read, so nothing was written; reload and retry |
   | `413` | Request body larger than 1 MiB |

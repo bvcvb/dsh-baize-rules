@@ -13,8 +13,9 @@
 #   maxBytes: <number>                  model-visible byte budget (required)
 #   injectAtEveryStep: <boolean>        re-publish the snapshot on every step (debug)
 #   injectTags: <boolean>               render `[tag,…]` prefixes into the model context
-#   apiOriginCheck: <boolean>           panel API accepts same-machine/same-origin only (default true;
-#                                       turn off when a reverse proxy fronts the web UI)
+#   apiOriginCheck: <boolean>           panel API accepts same-machine/same-origin only (default false;
+#                                       turn on when the port is reachable by others and no proxy layer
+#                                       authenticates the callers)
 #   refreshAfterSteps: <number>         republish the snapshot once the last copy is this many steps
 #                                       old (default 20; 0 disables the periodic refresh)
 - insert:

@@ -56,7 +56,7 @@ dsh 自带 `@deepseek-ai/dsh-agent-instructions`，负责加载工作区指令�
 
 ```bash
 # 从 npm 安装到 web profile（版本以发布后的实际版本为准）
-dsh plugin --profile web add dsh-baize-rules@0.2.2
+dsh plugin --profile web add dsh-baize-rules@0.2.3
 pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 dsh --profile web
 ```
@@ -78,7 +78,7 @@ pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 装到**另一个 profile**，正在运行的 dsh 完全不受影响：
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.2
+dsh plugin --profile smoke add dsh-baize-rules@0.2.3
 dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 dsh
 ```
 
@@ -260,16 +260,17 @@ Global requirements:
 | `injectAtEveryStep` | `false` | 每步强制重渲（调试用）；默认为仅变化时打补丁 |
 | `refreshAfterSteps` | `20` | 距上次发布的副本满这么多步就重新发布一份（即使文本未变），避免长对话里规则只留在最开头。`0` 关闭周期刷新 |
 | `injectTags` | `false` | 为 `true` 时把标签渲染进模型上下文（`- [流程,发布] 正文`）。默认关闭：标签是给人看的分类器，注入会占预算并添噪声 |
-| `apiOriginCheck` | `true` | 面板 API 只接受**本机 + 同源**请求；当 Web UI 由反向代理前置时关闭 |
+| `apiOriginCheck` | `false` | 为 `true` 时面板 API 只接受**本机 + 同源**请求；默认关闭，反代前置的 Web UI 因此可直接使用 |
 
 > `scope` 与 `maxBytes` 是 **schema 必填项**，不是「可选 + 隐式兜底」。缺任一项会让插件加载失败，并给出
 > 明确指出缺失字段的错误——以前静默使用未定义的默认作用域，会把配置错误藏起来。
 >
-> **`apiOriginCheck`（默认 `true`）。** 面板 API 只应答**来自本机**的请求，且当浏览器声明了 `Origin` 时，
-> 必须来自**宿主自身的源**（或本地 `file://` 页面，其 Origin 为 `null`）。其它情况一律以 `403` 拒绝。
-> 之所以有这个校验：全局规则文件会进入**每个**会话的提示词，所以「只要能连上端口就行」是不够的。
-> 当 Web UI 通过**反向代理**或从**其它主机**访问时需要**关掉**它——这类请求要么来源地址不是 loopback，
-> 要么 `Origin` 不是宿主自身的源，会被直接拒掉。关闭校验后，鉴权责任在代理层。
+> **`apiOriginCheck`（默认 `false`）。** 开启后，面板 API 只应答**来自本机**的请求，且当浏览器声明了
+> `Origin` 时，必须来自**宿主自身的源**（或本地 `file://` 页面，其 Origin 为 `null`）；其它情况一律以
+> `403` 拒绝。之所以**默认关闭**：Web UI 通常经**反向代理**访问，这类请求的来源地址是代理而非 loopback，
+> 默认开启会让面板直接失效。当端口可能被本机以外的人访问、且没有代理层做鉴权时，才把它**开启**——
+> 这个校验存在的理由是全局规则文件会进入**每个**会话的提示词，「只要能连上端口就行」是不够的。
+> 关闭校验时，鉴权责任在传输层（dsh 自身的 token）与代理层。
 
 ### 挂载元数据（`cordis.patch.yml`）
 
@@ -366,7 +367,7 @@ API：
   | 状态码 | 含义 |
   |---|---|
   | `400` | 请求被拒：JSON body 格式错误、`raw` 为空、缺 `ruleId`/`text`，或编辑了本次请求没有存储键的作用域（无会话、无 cwd） |
-  | `403` | 来源被拒——请求**并非来自本机**（来源地址不是 loopback），或浏览器声明的 `Origin` 既不是宿主自身的源、也不是本地页面（跨站）。经由反向代理或从其它主机访问 UI 时，设为 `apiOriginCheck: false`，把鉴权交给代理层 |
+  | `403` | 来源被拒——**仅在 `apiOriginCheck: true` 时出现**：请求**并非来自本机**（来源地址不是 loopback），或浏览器声明的 `Origin` 既不是宿主自身的源、也不是本地页面（跨站）。默认关闭，因此反代前置的 Web UI 不会遇到它 |
   | `405` | 非 `GET`/`POST` 方法 |
   | `409` | 并发冲突——文件在读取之后被改过，什么都没写入，需刷新重试 |
   | `413` | 请求 body 超过 1 MiB |
