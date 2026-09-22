@@ -348,12 +348,12 @@ The published package also exposes a dsh web client panel (`lib/client.js`; see 
 
 ### Where the panel lives
 
-The panel registers itself into two dsh client slots (`ctx.slots.inject('sidebar.footer.action')` and
-`ctx.slots.inject('conversation.view')`), so there are three ways in and they all show the same data:
+The panel registers itself into the dsh client slot `ctx.slots.inject('conversation.view')` — the panel is a tab in that conversation's view ring, and it shares the store/core with the `/baize-rules` command:
 
-- **Sidebar footer → 「规则」 button** — always available, opens (or focuses) the panel.
-- **In-session 「规则」 tab** — when a conversation is open, the panel is a tab in that conversation's view ring.
-- **New-chat page** — with no session yet there is no tab ring, so the button opens a full-viewport overlay instead.
+- **In-session 「规则」 tab** — when a conversation is open, the panel is a tab in that conversation's view ring; this is the **only** way in.
+- **0.2.4 removed the sidebar footer 「规则」 button**: it used to sit directly above Settings and doubled as the entry point of the new-chat full-viewport overlay. The button, the overlay and its sidebar-footer-only layout styles are all gone.
+
+> **The new-chat page has no entry point** (a known trade-off): with no session there is no tab ring, so after 0.2.4 the panel cannot be opened there. Rule injection and the `/baize-rules` command are unaffected.
 
 The panel has two panes:
 
@@ -370,7 +370,7 @@ The panel has two panes:
 > the body and tags there → back on the **Rules** pane open **From template** and tick the entries you want
 > → choose the scope and add them.
 
-> **Scope availability**: the panel only offers session/project when it is **attached to a conversation** — opened from the new-chat page (no session yet) those two buttons are disabled with a hint and only global rules can be edited, which avoids the old behaviour where a rule looked added and then vanished.
+> **Scope availability**: the panel only offers session/project when it is **attached to a conversation** — when the host hands it no `sessionId` those two buttons are disabled with a hint and only global rules can be edited, which avoids the old behaviour where a rule looked added and then vanished.
 >
 > The project directory does **not** come from the panel: the host resolves the session's cwd itself (`resolveProject`), so project rules are available whenever you are in a conversation.
 

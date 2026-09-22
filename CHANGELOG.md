@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.4] - 2026-09-22
+
+### Removed
+- **The sidebar footer 「规则」 button is gone.** The panel used to register a second slot (`ctx.slots.inject('sidebar.footer.action')`, id `baize-rules`, order 1) that rendered `RulesTrigger` directly above Settings — the entry 0.2.2 had to add a sidebar-stacking CSS patch for. Removed together with it: the button component, its full-viewport no-tab-ring fallback `RulesOverlay`, the rules icon, the module-scoped overlay store (`useRulesOverlay`), the `rules.sidebar.aria` / `rules.panel.open` / `rules.overlay.close` locale keys (zh + en), and the five `footerActions` / `.baize-trigger` CSS rules. The panel now registers exactly **one** slot — `conversation.view` — so it is reachable only from an open conversation's 「规则」 tab.
+- Accompanying trade-off, accepted deliberately: the new-chat page (no session yet ⇒ no tab ring) can no longer open the panel at all. Rule injection, the `/baize-rules` command and the template library are untouched.
+
+### Changed
+- `test/client.smoke.mjs` asserts the single registration, and that no `sidebar.footer.action`, `baize-trigger` or `RulesOverlay` markup/CSS survives in the bundle.
+- README (EN + ZH) documents the single entry point and the new-chat trade-off.
+
 ## [0.2.3] - 2026-09-22
 
 ### Changed

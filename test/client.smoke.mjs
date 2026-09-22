@@ -203,11 +203,20 @@ check('no require binding is dead code', () => {
   assert.deepEqual(dead, [], 'required but never used: ' + dead.join(', '))
 })
 
-check('apply registers the sidebar trigger and the conversation view', () => {
+check('apply registers only the conversation view', () => {
   const names = booted.registrations.map((r) => r.meta.name).sort()
-  assert.deepEqual(names, ['conversation.view', 'sidebar.footer.action'])
+  assert.deepEqual(names, ['conversation.view'])
   assert.equal(booted.seen.effects, 1, 'exactly one effect (dictionary registration)')
   assert.ok(booted.seen.dicts, 'dictionaries were never registered')
+})
+
+check('the sidebar footer trigger is gone (0.2.4)', () => {
+  assert.equal(
+    source.indexOf('sidebar.footer.action'), -1,
+    'the sidebar footer trigger slot is registered again',
+  )
+  assert.equal(source.indexOf('baize-trigger'), -1, 'the trigger markup/styles are back')
+  assert.equal(source.indexOf('RulesOverlay'), -1, 'the no-tab-ring overlay is back')
 })
 
 check('the conversation.view renderer forwards sessionId (no dead cwd chain)', () => {
@@ -316,11 +325,11 @@ check('style tag uses data-plugin / data-plugin-css', () => {
   assert.ok(tag.dataset.pluginCss.length > 0)
 })
 
-check('injected css keeps the sidebar layout patch', () => {
+check('injected css no longer patches the sidebar footer', () => {
   const css = booted.appends[0].textContent
-  assert.ok(css.indexOf('footerActions') >= 0, 'the footer layout rule is gone')
-  assert.ok(css.indexOf(':has(') >= 0, 'the class-name-independent fallback rule is gone')
-  assert.ok(css.indexOf('.baize-trigger{') >= 0, 'the trigger styles are gone')
+  assert.equal(css.indexOf('footerActions'), -1, 'the footer layout rule is back')
+  assert.equal(css.indexOf('.baize-trigger'), -1, 'the trigger styles are back')
+  assert.ok(css.indexOf('.baize-seg{') >= 0, 'the panel styles went missing')
 })
 
 check('a style tag left by an earlier load is not injected twice', () => {
