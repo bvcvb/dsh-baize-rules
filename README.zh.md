@@ -56,7 +56,7 @@ dsh 自带 `@deepseek-ai/dsh-agent-instructions`，负责加载工作区指令�
 
 ```bash
 # 从 npm 安装到 web profile（版本以发布后的实际版本为准）
-dsh plugin --profile web add dsh-baize-rules@0.2.3
+dsh plugin --profile web add dsh-baize-rules@0.2.4
 pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 dsh --profile web
 ```
@@ -78,7 +78,7 @@ pm2 restart dsh          # dsh 由 pm2 托管时重载生效
 装到**另一个 profile**，正在运行的 dsh 完全不受影响：
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.3
+dsh plugin --profile smoke add dsh-baize-rules@0.2.4
 dsh --profile smoke --dump-config   # 只读取并组合配置，不会启动 dsh
 ```
 

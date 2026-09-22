@@ -56,7 +56,7 @@ Both inject a sourced `user/message` framed with `<system-reminder>`, and both c
 
 ```bash
 # Install from npm into the web profile (use the actual published version)
-dsh plugin --profile web add dsh-baize-rules@0.2.3
+dsh plugin --profile web add dsh-baize-rules@0.2.4
 pm2 restart dsh          # Reload when dsh is managed by pm2
 dsh --profile web
 ```
@@ -80,7 +80,7 @@ If the entry lingers in the profile's `dsh.profile.bundles`, delete that line fr
 Install into a **separate profile** so your currently running dsh stays unchanged:
 
 ```bash
-dsh plugin --profile smoke add dsh-baize-rules@0.2.3
+dsh plugin --profile smoke add dsh-baize-rules@0.2.4
 dsh --profile smoke --dump-config   # read & compose the config only — does not boot dsh
 ```
 
